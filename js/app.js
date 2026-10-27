@@ -12,6 +12,7 @@ import { indexChart, weatherChart, accumChart, soilChart, getChart, destroyChart
 import { openReport } from './report.js';
 import { writeGeoTiff } from './tiffwriter.js';
 import { growthStage, STAGE_COLORS } from './stages.js';
+import { MapView, pathLength } from './mapview.js';
 
 const DAY = 86400000;
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -49,59 +50,37 @@ const selField = () => fieldById(S.sel);
 const saveFields = () => store.saveFields(S.fields);
 const saveNotes = () => { if (!store.saveNotes(S.notes)) toast(t('msg.storageFull'), 'error'); };
 
-// ---------------------------------------------------------------- map
-// Fractional zoom + gentler wheel steps make zooming feel continuous instead of jumping a whole level.
-const map = L.map('map', {
-  zoomControl: false, attributionControl: true, preferCanvas: false,
-  zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 120, wheelDebounceTime: 20,
-  zoomAnimation: true, fadeAnimation: true, markerZoomAnimation: true, inertia: true, maxZoom: 20,
-}).setView([12.65, 104.9], 7);
-// Keep extra tiles around the view and do not request intermediate levels mid-animation.
-const TILE_OPTS = { keepBuffer: 6, updateWhenZooming: false, updateWhenIdle: false, maxZoom: 20 };
-L.control.zoom({ position: 'topleft' }).addTo(map);
-L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+// ---------------------------------------------------------------- map (MapLibre GL, see mapview.js)
+const mv = new MapView('map', {
+  onClick: (e) => onMapClick(e),
+  onHover: (e) => pixelReadout(e),
+  onMoveStart: () => { $('#pixelInfo').hidden = true; },
+});
 
-const BASEMAPS = {
-  satellite: L.layerGroup([
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { ...TILE_OPTS, maxNativeZoom: 18, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }),
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { ...TILE_OPTS, maxNativeZoom: 18, opacity: 0.85 }),
-  ]),
-  streets: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { ...TILE_OPTS, maxNativeZoom: 19, attribution: '© OpenStreetMap contributors' }),
-  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { ...TILE_OPTS, maxNativeZoom: 17, attribution: '© OpenTopoMap (CC-BY-SA), © OpenStreetMap' }),
-};
-let basemap = null;
 function setBasemap(key) {
-  if (!BASEMAPS[key]) key = 'satellite';
-  if (basemap) map.removeLayer(basemap);
-  basemap = BASEMAPS[key].addTo(map);
-  basemap.bringToBack && basemap.bringToBack();
+  if (!['satellite', 'streets', 'topo'].includes(key)) key = 'satellite';
+  mv.setBasemap(key);
   S.settings.basemap = key; store.saveSettings(S.settings);
   $('#basemapSelect').value = key;
 }
 
-const fieldLayer = L.featureGroup().addTo(map);
-const notesLayer = L.layerGroup().addTo(map);
-const layerById = new Map();
+function renderFieldLayers() { mv.setFields(S.fields, S.sel); }
+const restyleFields = renderFieldLayers;
 
-function fieldStyle(f) {
-  const sel = f.id === S.sel;
-  return { color: sel ? '#ffffff' : (f.color || '#ffd54a'), weight: sel ? 3 : 2, fillOpacity: sel ? 0 : 0.12, fillColor: f.color || '#ffd54a', dashArray: null };
+function fieldsBox(list = S.fields) {
+  let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
+  for (const f of list) { const b = geo.bbox(f.geometry); w = Math.min(w, b[0]); s = Math.min(s, b[1]); e = Math.max(e, b[2]); n = Math.max(n, b[3]); }
+  return [w, s, e, n];
 }
-
-function renderFieldLayers() {
-  fieldLayer.clearLayers(); layerById.clear();
-  for (const f of S.fields) {
-    const lyr = L.geoJSON({ type: 'Feature', geometry: f.geometry, properties: {} }, { style: () => fieldStyle(f) });
-    lyr.on('click', (e) => { if (S.noteMode) return; L.DomEvent.stopPropagation(e); selectField(f.id); });
-    lyr.bindTooltip(esc(f.name), { sticky: true, direction: 'top', className: 'field-tip' });
-    lyr.addTo(fieldLayer);
-    layerById.set(f.id, lyr);
-  }
+function mapPadding() {
+  const wide = window.innerWidth > 860;
+  return { top: 70, bottom: wide ? 110 : 90, left: wide ? 60 : 30, right: wide && !$('#legend').hidden ? 320 : (wide ? 60 : 30) };
 }
+function fitAllFields(maxZoom = 15) { if (S.fields.length) mv.fitBox(fieldsBox(), { maxZoom, padding: mapPadding() }); }
 
-function restyleFields() {
-  for (const f of S.fields) { const l = layerById.get(f.id); if (l) l.setStyle(fieldStyle(f)); }
-  const l = layerById.get(S.sel); if (l) l.bringToFront();
+function onMapClick(e) {
+  if (S.noteMode) { setNoteMode(false); noteDialog({ lat: e.lat, lng: e.lng }); return; }
+  if (e.fieldId && e.fieldId !== S.sel) selectField(e.fieldId);
 }
 
 // ---------------------------------------------------------------- field list
@@ -123,27 +102,38 @@ function renderFieldList() {
   const q = ($('#fieldSearch').value || '').toLowerCase();
   const ul = $('#fieldList');
   ul.innerHTML = '';
+  const info = new Map(S.fields.map(f => { const r = latestTs(f.id); return [f.id, { last: r[0], prev: r[1], d: r[0] && r[1] ? r[0].mean - r[1].mean : null }]; }));
   const list = S.fields.filter(f => !q || f.name.toLowerCase().includes(q) || cropName(f.crop).toLowerCase().includes(q));
-  let total = 0;
-  for (const f of S.fields) total += f.areaM2 || 0;
+  const sort = S.settings.sort || 'name';
+  const val = (f) => info.get(f.id);
+  list.sort((a, b) => {
+    if (sort === 'ndvi') return (val(a).last?.mean ?? 9) - (val(b).last?.mean ?? 9);
+    if (sort === 'change') return (val(a).d ?? 9) - (val(b).d ?? 9);
+    if (sort === 'area') return b.areaM2 - a.areaM2;
+    return a.name.localeCompare(b.name);
+  });
+  let total = 0, alerts = 0;
+  for (const f of S.fields) { total += f.areaM2 || 0; if ((val(f).d ?? 0) <= -0.05) alerts++; }
   for (const f of list) {
-    const last = latestTs(f.id)[0];
+    const { last, d } = val(f);
     const fill = last ? cssColor(valueColor('NDVI', last.mean)) : 'var(--surface-3)';
-    const li = h(`<li class="field-item" tabindex="0" data-id="${f.id}">
+    const alert = d != null && d <= -0.05;
+    const li = h(`<li class="field-item${alert ? ' alert' : ''}" tabindex="0" data-id="${f.id}" ${alert ? `title="${esc(t('fields.dropTip'))}"` : ''}>
       ${shapeSvg(f.geometry, fill)}
       <div class="fi-main"><div class="fi-name">${esc(f.name)}</div>
       <div class="fi-sub">${esc(cropName(f.crop))} · ${geo.fmtArea(f.areaM2)} ${t('unit.ha')}</div></div>
-      <div class="fi-ndvi">${last ? `<b>${last.mean.toFixed(2)}</b><small>${fmtDate(last.date, { day: 'numeric', month: 'short' })}</small>` : '<small>—</small>'}</div>
+      <div class="fi-ndvi">${last ? `<b>${alert ? '<span class="warn-ic">⚠</span>' : ''}${last.mean.toFixed(2)}</b><small>${d != null ? deltaHtml(d) : fmtDate(last.date, { day: 'numeric', month: 'short' })}</small>` : '<small>—</small>'}</div>
     </li>`);
     li.addEventListener('click', () => selectField(f.id));
     li.addEventListener('keydown', (e) => { if (e.key === 'Enter') selectField(f.id); });
-    li.addEventListener('mouseenter', () => { const l = layerById.get(f.id); if (l) l.setStyle({ weight: 4 }); });
-    li.addEventListener('mouseleave', () => restyleFields());
+    li.addEventListener('mouseenter', () => mv.hoverField(f.id));
+    li.addEventListener('mouseleave', () => mv.hoverField(null));
     ul.appendChild(li);
   }
   $('#fieldCount').textContent = S.fields.length ? String(S.fields.length) : '';
   $('#emptyState').hidden = S.fields.length > 0;
-  $('#listFoot').textContent = S.fields.length ? t('fields.total', { n: S.fields.length, ha: geo.fmtArea(total) }) : '';
+  if (!S.checkAll) $('#listFoot').innerHTML = S.fields.length ? `${esc(t('fields.total', { n: S.fields.length, ha: geo.fmtArea(total) }))}${alerts ? ` · <b class="alert-txt">⚠ ${esc(t('fields.alerts', { n: alerts }))}</b>` : ''}` : '';
+  $('#listTools').hidden = S.fields.length < 1;
 }
 
 // ---------------------------------------------------------------- field create / edit
@@ -241,56 +231,80 @@ async function deleteField(id) {
   toast(t('msg.deleted'));
 }
 
-// ---------------------------------------------------------------- drawing
+// ---------------------------------------------------------------- drawing & shape editing
 function startDraw() {
   stopModes();
-  S.drawing = new L.Draw.Polygon(map, { allowIntersection: false, showArea: false, shapeOptions: { color: '#ffd54a', weight: 2, fillOpacity: 0.15 } });
-  S.drawing.enable();
+  S.drawing = true;
   showHint(t('draw.hint'));
+  mv.startDraw({
+    kind: 'polygon',
+    onFinish: (geom) => {
+      S.drawing = false; hideHint();
+      const f = addField(geom);
+      if (!f) return;
+      renderFieldLayers(); renderFieldList();
+      selectField(f.id);
+      editFieldDialog(f, true);
+    },
+    onCancel: () => { S.drawing = false; hideHint(); },
+  });
 }
-
-map.on(L.Draw.Event.CREATED, (e) => {
-  const gj = e.layer.toGeoJSON().geometry;
-  hideHint();
-  S.drawing = null;
-  const f = addField(gj);
-  if (!f) return;
-  renderFieldLayers(); renderFieldList();
-  selectField(f.id);
-  editFieldDialog(f, true);
-});
-map.on(L.Draw.Event.DRAWSTOP, () => { S.drawing = null; if (!S.noteMode && !S.editing) hideHint(); });
 
 function startEditShape() {
   const f = selField(); if (!f) return;
   if (f.geometry.type !== 'Polygon') { toast(t('msg.multiNoEdit'), 'error'); return; }
   stopModes();
-  const latlngs = f.geometry.coordinates.map(r => r.slice(0, -1).map(([x, y]) => [y, x]));
-  const poly = L.polygon(latlngs, { color: '#00e5ff', weight: 2, fillOpacity: 0.1 }).addTo(map);
-  poly.editing.enable();
-  S.editing = poly;
-  const bar = $('#editBar');
-  bar.hidden = false;
+  mv.startEdit(f.geometry);
+  S.editing = true;
+  $('#editBar').hidden = false;
   showHint(t('edit.hint'));
 }
 
 function finishEditShape(save) {
-  const poly = S.editing; if (!poly) return;
+  if (!S.editing) return;
+  const g = mv.getEditGeometry();
+  mv.stopEdit();
+  S.editing = false; $('#editBar').hidden = true; hideHint();
   const f = selField();
-  if (save && f) {
-    const g = geo.cleanGeom(poly.toGeoJSON().geometry);
-    f.geometry = g; f.areaM2 = geo.areaM2(g);
+  if (save && f && g) {
+    f.geometry = geo.cleanGeom(g); f.areaM2 = geo.areaM2(f.geometry);
     saveFields(); store.clearTs(f.id);
     S.resultCache.clear();
+    renderFieldLayers(); renderFieldList(); selectField(f.id, { force: true });
   }
-  poly.editing.disable(); map.removeLayer(poly);
-  S.editing = null; $('#editBar').hidden = true; hideHint();
-  if (save && f) { renderFieldLayers(); renderFieldList(); selectField(f.id, { force: true }); }
+}
+
+// ---------------------------------------------------------------- measuring tool
+function fmtLen(m) { return m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`; }
+function showMeasure(pts) {
+  if (!pts || pts.length < 2) { showHint(t('measure.hint')); return; }
+  let txt = `${t('measure.dist')}: ${fmtLen(pathLength(pts))}`;
+  if (pts.length >= 3) {
+    const ring = [...pts, pts[0]];
+    const a = geo.areaM2({ type: 'Polygon', coordinates: [ring] });
+    txt += ` · ${t('measure.area')}: ${(a / 10000).toFixed(2)} ${t('unit.ha')} · ${t('measure.perim')}: ${fmtLen(pathLength(ring))}`;
+  }
+  showHint(txt);
+}
+function startMeasure() {
+  stopModes();
+  S.measure = true;
+  $('#btnMeasure').classList.add('active');
+  showHint(t('measure.hint'));
+  mv.startDraw({ kind: 'measure', onChange: showMeasure, onFinish: showMeasure, onCancel: () => {} });
+}
+function stopMeasure() {
+  if (!S.measure) return;
+  S.measure = false;
+  mv.stopDraw(true);
+  $('#btnMeasure').classList.remove('active');
+  hideHint();
 }
 
 function stopModes() {
-  if (S.drawing) { S.drawing.disable(); S.drawing = null; }
+  if (S.drawing) { mv.stopDraw(); S.drawing = false; }
   if (S.editing) finishEditShape(false);
+  stopMeasure();
   setNoteMode(false);
   hideHint();
 }
@@ -308,7 +322,7 @@ function showList() {
   $('#timeline').hidden = true; $('#legend').hidden = true;
   document.body.classList.remove('has-field');
   restyleFields(); renderFieldList(); renderNotesLayer();
-  if (fieldLayer.getLayers().length) map.fitBounds(fieldLayer.getBounds(), { padding: [30, 30], maxZoom: 15 });
+  fitAllFields();
 }
 
 function selectField(id, { force = false } = {}) {
@@ -333,8 +347,8 @@ function selectField(id, { force = false } = {}) {
 }
 
 function zoomToField() {
-  const l = layerById.get(S.sel);
-  if (l) map.fitBounds(l.getBounds(), { padding: [40, 40], maxZoom: 17, paddingTopLeft: [20, 20] });
+  const f = selField();
+  if (f) mv.fitBox(geo.bbox(f.geometry), { maxZoom: 17.5, padding: mapPadding() });
 }
 
 function renderFieldHeader() {
@@ -477,7 +491,7 @@ function markTimeline() {
 
 // ---------------------------------------------------------------- overlay rendering
 function clearOverlay() {
-  if (S.overlay) { map.removeLayer(S.overlay); S.overlay = null; }
+  if (S.overlay) { mv.clearOverlay(); S.overlay = false; }
 }
 
 function canvasFor(res, zoneCls, colorFn) {
@@ -523,8 +537,8 @@ function drawResult() {
   if (!S.result) return;
   const g = S.grid;
   const cv = currentCanvas();
-  S.overlay = L.imageOverlay(cv.toDataURL(), [[g.south, g.west], [g.north, g.east]], { opacity: S.settings.opacity, className: 'idx-overlay', interactive: false }).addTo(map);
-  const l = layerById.get(S.sel); if (l) l.bringToFront();
+  mv.setOverlay(cv.toDataURL(), g, S.settings.opacity);
+  S.overlay = true;
 }
 
 // ---------------------------------------------------------------- legend
@@ -576,17 +590,12 @@ function renderLegend() {
 
 function fmtNum(v) { return Math.abs(v) >= 10 ? v.toFixed(0) : (Math.round(v * 100) / 100).toString(); }
 
-// pixel readout
-let hoverEvt = null;
-map.on('mousemove', (e) => {
-  if (!hoverEvt) requestAnimationFrame(() => { const ev = hoverEvt; hoverEvt = null; pixelReadout(ev); });
-  hoverEvt = e;
-});
+// pixel readout (MapView already throttles hover events to one per frame)
 function pixelReadout(e) {
   const box = $('#pixelInfo');
   const r = S.result, g = S.grid;
-  if (!r || !g || S.drawing || S.editing) { box.hidden = true; return; }
-  const col = Math.floor((e.latlng.lng - g.west) / g.dLon), row = Math.floor((g.north - e.latlng.lat) / g.dLat);
+  if (!e || !r || !g || S.drawing || S.editing || S.measure) { box.hidden = true; return; }
+  const col = Math.floor((e.lng - g.west) / g.dLon), row = Math.floor((g.north - e.lat) / g.dLat);
   if (col < 0 || row < 0 || col >= g.W || row >= g.H) { box.hidden = true; return; }
   const i = row * g.W + col, st = r.status[i];
   if (!st) { box.hidden = true; return; }
@@ -599,11 +608,9 @@ function pixelReadout(e) {
   else if (r.rgb) txt = `RGB ${r.rgb[i * 3]}, ${r.rgb[i * 3 + 1]}, ${r.rgb[i * 3 + 2]}`;
   else txt = `${r.indexKey} ${r.values[i].toFixed(3)}`;
   box.textContent = txt;
-  box.style.left = `${e.containerPoint.x + 14}px`; box.style.top = `${e.containerPoint.y + 14}px`;
+  box.style.left = `${e.x + 14}px`; box.style.top = `${e.y + 14}px`;
   box.hidden = false;
 }
-map.on('mouseout', () => { hoverEvt = null; $('#pixelInfo').hidden = true; });
-map.on('zoomstart movestart', () => { $('#pixelInfo').hidden = true; });
 
 // ---------------------------------------------------------------- tabs
 const TABS = ['overview', 'chart', 'weather', 'zones', 'notes'];
@@ -716,6 +723,30 @@ function weatherSummary(w) {
   return { td, rainPast7: sum(past7, 'rain'), rainNext7: sum(next7, 'rain'), et0Next7: sum(next7, 'et0'), sm: (w.soil.find(s => s.date === today) || {}).sm };
 }
 
+/** Simple agronomic weather alerts from the forecast and recent rain. */
+function weatherAlerts(w) {
+  const out = [];
+  const next = w.days.filter(d => d.date >= w.today && daysBetween(w.today, d.date) < 7);
+  const past10 = w.days.filter(d => d.date < w.today && daysBetween(d.date, w.today) <= 10);
+  const heavy = next.filter(d => (d.rain || 0) >= 50);
+  if (heavy.length) out.push({ kind: 'rain', ic: '🌧', text: t('alert.rain', { d: fmtDate(heavy[0].date, { day: 'numeric', month: 'short' }), mm: Math.round(heavy[0].rain) }) });
+  const hot = next.filter(d => (d.tmax ?? 0) >= 36);
+  if (hot.length) out.push({ kind: 'heat', ic: '🌡', text: t('alert.heat', { n: hot.length, t: Math.round(Math.max(...hot.map(d => d.tmax))) }) });
+  const sum = (a) => a.reduce((s, d) => s + (d.rain || 0), 0);
+  if (past10.length >= 8 && sum(past10) < 5 && sum(next) < 5) out.push({ kind: 'dry', ic: '☀', text: t('alert.dry') });
+  const sprayDays = next.filter(d => (d.rain || 0) < 1).slice(0, 3);
+  if (!out.length) out.push({ kind: 'ok', ic: '✓', text: t('alert.none') });
+  if (sprayDays.length && !hot.length) out.push({ kind: 'info', ic: '🧴', text: t('alert.spray', { d: sprayDays.map(d => fmtDate(d.date, { day: 'numeric', month: 'short' })).join(', ') }) });
+  return out;
+}
+const alertsHtml = (w) => `<ul class="alerts">${weatherAlerts(w).map(a => `<li class="${a.kind}"><span>${a.ic}</span>${esc(a.text)}</li>`).join('')}</ul>`;
+
+function forecastStrip(w) {
+  const next = w.days.filter(d => d.date >= w.today).slice(0, 7);
+  const ic = (d) => (d.rain || 0) >= 20 ? '🌧' : (d.rain || 0) >= 5 ? '🌦' : (d.rain || 0) >= 1 ? '⛅' : '☀';
+  return `<div class="fc-strip">${next.map(d => `<div class="fc-day"><span>${fmtDate(d.date, { day: 'numeric', month: 'short' })}</span><i>${ic(d)}</i><b>${Math.round(d.tmax)}°</b><small>${Math.round(d.tmin)}°</small><em>${(d.rain || 0).toFixed(0)} mm</em></div>`).join('')}</div>`;
+}
+
 async function renderOvWeather(f) {
   const card = $('#ovWeather'); if (!card) return;
   try {
@@ -728,7 +759,7 @@ async function renderOvWeather(f) {
         <div><span>${t('wx.rainPast7')}</span><b>${s.rainPast7.toFixed(0)} mm</b></div>
         <div><span>${t('wx.rainNext7')}</span><b>${s.rainNext7.toFixed(0)} mm</b></div>
         <div><span>${t('wx.soil')}</span><b>${s.sm != null ? `${(s.sm * 100).toFixed(0)}%` : '—'}</b></div>
-      </div><button class="btn sm" id="ovWxMore">${t('ov.openWeather')}</button>`;
+      </div>${alertsHtml(w)}<button class="btn sm" id="ovWxMore">${t('ov.openWeather')}</button>`;
     $('#ovWxMore').onclick = () => setTab('weather');
   } catch {
     if ($('#ovWeather')) $('#ovWeather').innerHTML = `<h3>${t('ov.weather')}</h3><p class="muted small">${t('wx.error')}</p>`;
@@ -752,6 +783,8 @@ async function renderWeatherTab(body, f) {
       <div class="kpi"><span>${t('wx.rainNext7')}</span><b>${s.rainNext7.toFixed(0)} mm</b><small>ET₀ ${s.et0Next7.toFixed(0)} mm</small></div>
       <div class="kpi"><span>${t('wx.soil')}</span><b>${s.sm != null ? `${(s.sm * 100).toFixed(0)}%` : '—'}</b><small>3–9 cm</small></div>
     </div>
+    <div class="card"><h3>${t('alert.title')}</h3>${alertsHtml(w)}</div>
+    <div class="card"><h3>${t('wx.forecast7')}</h3>${forecastStrip(w)}</div>
     <div class="card"><h3>${t('wx.chartTitle')}</h3><div class="chart-box"><canvas id="wxChart"></canvas></div></div>
     <div class="card"><h3>${t('wx.accTitle', { d: fmtDate(accStart) })}</h3>
       ${lastAcc ? `<p class="small">${t('wx.accSummary', { gdd: Math.round(lastAcc.gdd), rain: Math.round(lastAcc.rain), et0: Math.round(lastAcc.et0), base: S.settings.gddBase })}</p>` : ''}
@@ -1021,27 +1054,21 @@ function renderZoneTable() {
 function catIcon(c) { return ({ disease: '🦠', pest: '🐛', weed: '🌿', water: '💧', nutrient: '🧪', damage: '⚠️', other: '📍' })[c] || '📍'; }
 
 function renderNotesLayer() {
-  notesLayer.clearLayers();
-  for (const n of S.notes) {
-    if (S.sel && n.fieldId !== S.sel) continue;
-    const icon = L.divIcon({ className: 'note-pin', html: `<span>${catIcon(n.cat)}</span>`, iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26] });
-    const m = L.marker([n.lat, n.lng], { icon }).addTo(notesLayer);
-    m.bindPopup(`<div class="note-pop"><b>${catIcon(n.cat)} ${esc(t(`cat.${n.cat}`))}</b> · ${fmtDate(n.date)}<p>${esc(n.text)}</p>${n.photo ? `<img src="${n.photo}" alt="">` : ''}</div>`, { maxWidth: 260 });
-  }
+  const list = S.notes.filter(n => !S.sel || n.fieldId === S.sel);
+  mv.setNotes(list, {
+    icon: (n) => catIcon(n.cat),
+    html: (n) => `<div class="note-pop"><b>${catIcon(n.cat)} ${esc(t(`cat.${n.cat}`))}</b> · ${fmtDate(n.date)}<p>${esc(n.text)}</p>${n.photo ? `<img src="${n.photo}" alt="">` : ''}</div>`,
+  });
 }
 
 function setNoteMode(on) {
   S.noteMode = on;
   document.body.classList.toggle('note-mode', on);
-  if (on) showHint(t('notes.hint')); else if (!S.drawing && !S.editing) hideHint();
+  mv.setCursor(on ? 'crosshair' : ''); mv.cursorLocked = on;
+  if (on) showHint(t('notes.hint')); else if (!S.drawing && !S.editing && !S.measure) hideHint();
   const b = $('#noteAdd'); if (b) b.classList.toggle('active', on);
 }
 
-map.on('click', (e) => {
-  if (!S.noteMode) return;
-  setNoteMode(false);
-  noteDialog({ lat: e.latlng.lat, lng: e.latlng.lng });
-});
 
 function resizePhoto(file, max = 640) {
   return new Promise((resolve, reject) => {
@@ -1101,7 +1128,7 @@ function renderNotesTab(body, f) {
     const n = S.notes.find(x => x.id === li.dataset.id); if (!n) return;
     if (a === 'del') { if (await confirmBox(t('notes.confirmDel'), t('ui.delete'))) { S.notes = S.notes.filter(x => x.id !== n.id); saveNotes(); renderNotesLayer(); renderTab(); } }
     else if (a === 'edit') noteDialog(n, n);
-    else { map.setView([n.lat, n.lng], Math.max(map.getZoom(), 16)); }
+    else { mv.flyTo(n.lat, n.lng, Math.max(mv.getZoom(), 17)); }
   }));
 }
 
@@ -1148,7 +1175,7 @@ async function importFiles(files) {
     }
   }
   renderFieldLayers(); renderFieldList(); renderNotesLayer();
-  if (added) { toast(t('msg.imported', { n: added }) + (skipped ? ` ${t('msg.skipped', { n: skipped })}` : ''), 'ok'); map.fitBounds(fieldLayer.getBounds(), { padding: [30, 30], maxZoom: 16 }); }
+  if (added) { toast(t('msg.imported', { n: added }) + (skipped ? ` ${t('msg.skipped', { n: skipped })}` : ''), 'ok'); fitAllFields(16); }
   else if (skipped) toast(t('msg.noPolygons'), 'warn');
 }
 
@@ -1259,7 +1286,7 @@ $('#indexSelect').addEventListener('change', (e) => {
   if (S.sceneIdx >= 0) showScene(S.sceneIdx);
   if (S.tab === 'chart' || S.tab === 'zones') renderTab();
 });
-$('#opacity').addEventListener('input', (e) => { S.settings.opacity = +e.target.value; if (S.overlay) S.overlay.setOpacity(S.settings.opacity); });
+$('#opacity').addEventListener('input', (e) => { S.settings.opacity = +e.target.value; mv.setOverlayOpacity(S.settings.opacity); });
 $('#opacity').addEventListener('change', () => store.saveSettings(S.settings));
 $('#basemapSelect').addEventListener('change', (e) => setBasemap(e.target.value));
 $('#tlPrev').addEventListener('click', () => { if (S.sceneIdx < S.scenes.length - 1) showScene(S.sceneIdx + 1); });
@@ -1388,7 +1415,6 @@ function stageCard(f) {
 const STAGE_CROPS = new Set(['rice_wet', 'rice_dry', 'maize', 'soybean', 'mungbean', 'cassava', 'sugarcane', 'vegetables']);
 
 // ---------------------------------------------------------------- place search, location, full screen
-const searchLayer = L.layerGroup().addTo(map);
 function parseLatLon(q) {
   const m = q.trim().match(/^(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)$/);
   if (!m) return null;
@@ -1399,15 +1425,15 @@ function parseLatLon(q) {
 }
 
 function showSearchPin(lat, lon, label) {
-  searchLayer.clearLayers();
-  L.circleMarker([lat, lon], { radius: 8, color: '#fff', weight: 3, fillColor: '#e0593c', fillOpacity: 1 }).bindTooltip(esc(label || `${lat.toFixed(5)}, ${lon.toFixed(5)}`), { permanent: false }).addTo(searchLayer);
+  mv.clearPins();
+  mv.addPin(lat, lon, { kind: 'search', label: label || `${lat.toFixed(5)}, ${lon.toFixed(5)}` });
 }
 
 async function placeSearch(q) {
   const list = $('#placeResults');
   q = q.trim(); if (!q) { list.hidden = true; return; }
   const ll = parseLatLon(q);
-  if (ll) { map.flyTo(ll, 16, { duration: 1.2 }); showSearchPin(ll[0], ll[1]); list.hidden = true; return; }
+  if (ll) { mv.flyTo(ll[0], ll[1], 16); showSearchPin(ll[0], ll[1]); list.hidden = true; return; }
   list.innerHTML = `<li class="muted"><span class="spinner"></span></li>`; list.hidden = false;
   try {
     const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}&accept-language=${getLang() === 'km' ? 'km,en' : 'en'}`);
@@ -1419,8 +1445,8 @@ async function placeSearch(q) {
       const go = () => {
         list.hidden = true;
         const bb = p.boundingbox && p.boundingbox.map(Number);
-        if (bb && bb[1] - bb[0] > 0.002) map.flyToBounds([[bb[0], bb[2]], [bb[1], bb[3]]], { duration: 1.2, maxZoom: 16 });
-        else map.flyTo([+p.lat, +p.lon], 16, { duration: 1.2 });
+        if (bb && bb[1] - bb[0] > 0.002) mv.fitBox([bb[2], bb[0], bb[3], bb[1]], { maxZoom: 16, duration: 1600 });
+        else mv.flyTo(+p.lat, +p.lon, 16);
         showSearchPin(+p.lat, +p.lon, p.display_name);
       };
       li.addEventListener('click', go); li.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
@@ -1435,10 +1461,9 @@ function locateMe() {
   navigator.geolocation.getCurrentPosition((pos) => {
     btn.classList.remove('busy');
     const { latitude: lat, longitude: lon, accuracy } = pos.coords;
-    searchLayer.clearLayers();
-    L.circle([lat, lon], { radius: Math.min(accuracy, 2000), color: '#3b7dd8', weight: 1, fillOpacity: 0.12 }).addTo(searchLayer);
-    L.circleMarker([lat, lon], { radius: 7, color: '#fff', weight: 3, fillColor: '#3b7dd8', fillOpacity: 1 }).addTo(searchLayer);
-    map.flyTo([lat, lon], Math.max(map.getZoom(), 16), { duration: 1.2 });
+    mv.clearPins();
+    mv.addPin(lat, lon, { kind: 'gps', label: `±${Math.round(accuracy)} m` });
+    mv.flyTo(lat, lon, Math.max(mv.getZoom(), 16));
   }, () => { btn.classList.remove('busy'); toast(t('map.locError'), 'error'); }, { enableHighAccuracy: true, timeout: 15000 });
 }
 
@@ -1446,7 +1471,7 @@ function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen?.();
 }
-document.addEventListener('fullscreenchange', () => { $('#btnFull').classList.toggle('active', !!document.fullscreenElement); setTimeout(() => map.invalidateSize(), 150); });
+document.addEventListener('fullscreenchange', () => { $('#btnFull').classList.toggle('active', !!document.fullscreenElement); setTimeout(() => mv.resize(), 150); });
 if (!document.documentElement.requestFullscreen) $('#btnFull').hidden = true;
 
 $('#placeSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); placeSearch(e.target.value); } if (e.key === 'Escape') $('#placeResults').hidden = true; });
@@ -1455,6 +1480,56 @@ document.addEventListener('click', (e) => { if (!e.target.closest('.map-search')
 $('#btnLocate').addEventListener('click', locateMe);
 $('#btnFull').addEventListener('click', toggleFullscreen);
 $('#btnCompare').addEventListener('click', () => setCompare(!S.compare.on));
+
+// ---------------------------------------------------------------- check all fields (latest NDVI for every field)
+async function checkAllFields() {
+  if (S.checkAll || !S.fields.length) return;
+  const run = { stop: false };
+  S.checkAll = run;
+  const btn = $('#btnCheckAll'); btn.disabled = true;
+  const foot = $('#listFoot');
+  const end = new Date(), start = new Date(Date.now() - 45 * DAY);
+  let done = 0, updated = 0;
+  try {
+    for (const f of S.fields.slice()) {
+      if (run.stop) break;
+      foot.innerHTML = `<span class="spinner"></span> ${esc(t('fields.checking', { done, total: S.fields.length, name: f.name }))}`;
+      try {
+        const scenes = (await searchScenes(f.geometry, { start, end, maxCloud: 80, collection: S.settings.collection })).slice(0, 5);
+        const cache = store.getTs(f.id, 'NDVI');
+        const grid = geo.makeGrid(f.geometry);
+        for (const sc of scenes) {
+          let rec = cache[sc.id];
+          if (!rec) {
+            const r = await processScene(grid, sc, 'NDVI');
+            rec = { date: sc.date, mean: r.stats ? r.stats.mean : NaN, p10: r.stats?.p10, p90: r.stats?.p90, std: r.stats?.std, valid: r.validFrac, cloud: r.cloudFrac };
+            store.putTs(f.id, 'NDVI', sc.id, rec);
+          }
+          if (rec.valid >= 0.6 && Number.isFinite(rec.mean)) { updated++; break; }
+        }
+      } catch (e) { console.warn('check failed', f.name, e); }
+      done++;
+      renderFieldList();
+    }
+    toast(t('fields.checkDone', { n: updated, total: S.fields.length }), 'ok');
+  } finally {
+    S.checkAll = null; btn.disabled = false;
+    renderFieldList();
+  }
+}
+
+// ---------------------------------------------------------------- 3D terrain
+function toggle3D() {
+  S.is3D = !S.is3D;
+  mv.set3D(S.is3D);
+  $('#btn3D').classList.toggle('active', S.is3D);
+  $('#btn3D').setAttribute('aria-pressed', S.is3D);
+  if (S.is3D) toast(t('map.tip3d'), 'info', 5000);
+}
+$('#btn3D').addEventListener('click', toggle3D);
+$('#btnMeasure').addEventListener('click', () => (S.measure ? stopMeasure() : startMeasure()));
+$('#btnCheckAll').addEventListener('click', checkAllFields);
+$('#fieldSort').addEventListener('change', (e) => { S.settings.sort = e.target.value; store.saveSettings(S.settings); renderFieldList(); });
 
 // ---------------------------------------------------------------- wiring
 $('#btnDraw').addEventListener('click', startDraw);
@@ -1508,12 +1583,13 @@ function refreshLanguage() {
   applyI18n(document);
   renderIndexSelect();
   $('#opacity').value = S.settings.opacity;
+  $('#fieldSort').value = S.settings.sort || 'name';
   setBasemap(S.settings.basemap);
   renderFieldLayers();
   renderFieldList();
   renderNotesLayer();
-  if (S.fields.length) map.fitBounds(fieldLayer.getBounds(), { padding: [30, 30], maxZoom: 15 });
-  if (!globalThis.GeoTIFF) toast(t('msg.libFail'), 'error', 10000);
+  if (S.fields.length) fitAllFields();
+  if (!globalThis.GeoTIFF || !globalThis.maplibregl) toast(t('msg.libFail'), 'error', 10000);
   const hash = new URLSearchParams(location.hash.slice(1));
   if (hash.get('field') && fieldById(hash.get('field'))) selectField(hash.get('field'));
 })();

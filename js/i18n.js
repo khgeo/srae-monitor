@@ -25,8 +25,8 @@ const en = {
 
   'tabs.overview': 'Status', 'tabs.chart': 'Index chart', 'tabs.weather': 'Weather', 'tabs.zones': 'Zones', 'tabs.notes': 'Scouting',
 
-  'draw.hint': 'Click on the map to add boundary points. Click the first point to finish. Esc to cancel.',
-  'edit.hint': 'Drag the white handles to reshape the field, then press Save shape.',
+  'draw.hint': 'Click on the map to add boundary points. Click the first point, double-click or press Enter to finish. Backspace undoes, Esc cancels.',
+  'edit.hint': 'Drag the white corners to reshape. Drag a small blue dot to add a corner; right-click a corner to remove it. Then press Save shape.',
   'edit.save': 'Save shape', 'edit.cancel': 'Cancel',
 
   'map.index': 'Index', 'map.opacity': 'Opacity', 'map.basemap': 'Base map', 'map.loading': 'Processing Sentinel-2 image…',
@@ -111,6 +111,17 @@ const en = {
   'stage.heading': 'Heading & flowering', 'stage.grainfill': 'Grain filling', 'stage.maturity': 'Maturity', 'stage.vegetative': 'Vegetative', 'stage.flowering': 'Flowering',
   'stage.podfill': 'Pod filling', 'stage.establishment': 'Establishment', 'stage.canopy': 'Canopy growth', 'stage.bulking': 'Root bulking',
   'stage.germination': 'Germination', 'stage.grandgrowth': 'Grand growth', 'stage.ripening': 'Ripening',
+  'fields.sort': 'Sort', 'sort.name': 'Name', 'sort.ndvi': 'NDVI (lowest first)', 'sort.change': 'Biggest NDVI drop', 'sort.area': 'Area (largest first)',
+  'fields.checkAll': 'Check all', 'fields.checkTip': 'Get the latest clear Sentinel-2 NDVI for every field',
+  'fields.checking': 'Checking {done}/{total}: {name}…', 'fields.checkDone': 'Updated {n} of {total} fields with a recent clear image.',
+  'fields.alerts': '{n} need attention', 'fields.dropTip': 'NDVI dropped by 0.05 or more since the previous clear image',
+  'map.3d': '3D terrain view', 'map.measure': 'Measure distance and area', 'map.tip3d': '3D view: right-click and drag (or two fingers) to tilt and rotate.',
+  'measure.hint': 'Click points to measure. Double-click or Enter to finish; Backspace removes the last point.', 'measure.dist': 'Distance', 'measure.area': 'Area', 'measure.perim': 'Perimeter',
+  'alert.title': 'Alerts', 'alert.rain': 'Heavy rain expected {d}: about {mm} mm — check drainage, delay fertiliser.',
+  'alert.heat': 'Heat stress: {n} day(s) above 36 °C (up to {t} °C) — critical at flowering.',
+  'alert.dry': 'Dry spell: almost no rain for 10 days and none forecast — consider irrigation.',
+  'alert.none': 'No weather warnings for the next 7 days.', 'alert.spray': 'Dry days for spraying or fertilising: {d}',
+  'wx.forecast7': '7-day forecast',
   'demo.name': 'Demo rice field (Battambang)',
   'help.title': 'Help — how to use Srae Monitor',
 };
@@ -137,8 +148,8 @@ const km = {
 
   'tabs.overview': 'ស្ថានភាព', 'tabs.chart': 'ក្រាហ្វសន្ទស្សន៍', 'tabs.weather': 'អាកាសធាតុ', 'tabs.zones': 'តំបន់', 'tabs.notes': 'ការតាមដាន',
 
-  'draw.hint': 'ចុចលើផែនទីដើម្បីដាក់ចំណុចព្រំ។ ចុចចំណុចដំបូងដើម្បីបញ្ចប់។ Esc ដើម្បីបោះបង់។',
-  'edit.hint': 'អូសចំណុចពណ៌សដើម្បីកែរាងស្រែ រួចចុច «រក្សាទុករាង»។',
+  'draw.hint': 'ចុចលើផែនទីដើម្បីដាក់ចំណុចព្រំ។ ចុចចំណុចដំបូង ចុចពីរដង ឬ Enter ដើម្បីបញ្ចប់។ Backspace ត្រឡប់ក្រោយ Esc បោះបង់។',
+  'edit.hint': 'អូសជ្រុងពណ៌សដើម្បីកែរាង។ អូសចំណុចខៀវតូចដើម្បីបន្ថែមជ្រុង ចុចកណ្ដុរស្ដាំលើជ្រុងដើម្បីលុប។ រួចចុច «រក្សាទុករាង»។',
   'edit.save': 'រក្សាទុករាង', 'edit.cancel': 'បោះបង់',
 
   'map.index': 'សន្ទស្សន៍', 'map.opacity': 'ភាពស្រអាប់', 'map.basemap': 'ផែនទីមូលដ្ឋាន', 'map.loading': 'កំពុងដំណើរការរូបភាព Sentinel-2…',
@@ -223,6 +234,17 @@ const km = {
   'stage.heading': 'ចេញកួរ និងចេញផ្កា', 'stage.grainfill': 'ពេញគ្រាប់', 'stage.maturity': 'ទុំ', 'stage.vegetative': 'លូតលាស់ដើមស្លឹក', 'stage.flowering': 'ចេញផ្កា',
   'stage.podfill': 'ពេញសំបក', 'stage.establishment': 'ចាក់ឫស', 'stage.canopy': 'លូតលាស់ស្លឹក', 'stage.bulking': 'ធំមើម',
   'stage.germination': 'ដុះពន្លក', 'stage.grandgrowth': 'លូតលាស់ខ្លាំង', 'stage.ripening': 'ទុំ',
+  'fields.sort': 'តម្រៀប', 'sort.name': 'ឈ្មោះ', 'sort.ndvi': 'NDVI (ទាបមុន)', 'sort.change': 'NDVI ធ្លាក់ខ្លាំងបំផុត', 'sort.area': 'ផ្ទៃដី (ធំមុន)',
+  'fields.checkAll': 'ពិនិត្យទាំងអស់', 'fields.checkTip': 'ទាញយក NDVI Sentinel-2 ច្បាស់ចុងក្រោយសម្រាប់ស្រែនីមួយៗ',
+  'fields.checking': 'កំពុងពិនិត្យ {done}/{total}៖ {name}…', 'fields.checkDone': 'បានធ្វើបច្ចុប្បន្នភាព {n} ក្នុងចំណោម {total} ស្រែ ដោយរូបភាពច្បាស់ថ្មីៗ។',
+  'fields.alerts': '{n} ត្រូវយកចិត្តទុកដាក់', 'fields.dropTip': 'NDVI ធ្លាក់ចុះ 0.05 ឬច្រើនជាងនេះ ធៀបនឹងរូបភាពច្បាស់មុន',
+  'map.3d': 'ទិដ្ឋភាពសណ្ឋានដី 3D', 'map.measure': 'វាស់ចម្ងាយ និងផ្ទៃដី', 'map.tip3d': 'ទិដ្ឋភាព 3D៖ ចុចកណ្ដុរស្ដាំហើយអូស (ឬប្រើពីរម្រាមដៃ) ដើម្បីផ្អៀង និងបង្វិល។',
+  'measure.hint': 'ចុចចំណុចដើម្បីវាស់។ ចុចពីរដង ឬ Enter ដើម្បីបញ្ចប់។ Backspace លុបចំណុចចុងក្រោយ។', 'measure.dist': 'ចម្ងាយ', 'measure.area': 'ផ្ទៃដី', 'measure.perim': 'បរិមាត្រ',
+  'alert.title': 'ការព្រមាន', 'alert.rain': 'រំពឹងថាមានភ្លៀងខ្លាំង {d}៖ ប្រហែល {mm} mm — ពិនិត្យប្រព័ន្ធបង្ហូរទឹក ពន្យារការដាក់ជី។',
+  'alert.heat': 'កំដៅខ្លាំង៖ {n} ថ្ងៃលើស 36 °C (រហូតដល់ {t} °C) — គ្រោះថ្នាក់នៅពេលចេញផ្កា។',
+  'alert.dry': 'រាំងស្ងួត៖ ស្ទើរតែគ្មានភ្លៀង ១០ ថ្ងៃ ហើយគ្មានការព្យាករណ៍ភ្លៀង — គួរពិចារណាស្រោចស្រព។',
+  'alert.none': 'គ្មានការព្រមានអាកាសធាតុសម្រាប់ ៧ ថ្ងៃខាងមុខទេ។', 'alert.spray': 'ថ្ងៃស្ងួតសម្រាប់បាញ់ថ្នាំ ឬដាក់ជី៖ {d}',
+  'wx.forecast7': 'ព្យាករណ៍ ៧ ថ្ងៃ',
   'demo.name': 'ស្រែស្រូវគំរូ (បាត់ដំបង)',
   'help.title': 'ជំនួយ — របៀបប្រើ Srae Monitor',
 };
@@ -277,6 +299,8 @@ const HELP = {
 <p><b>Weather</b> shows rainfall, temperature, soil moisture, a 14-day forecast and growing degree days since sowing. <b>Zones</b> divides the field into 2–7 productivity zones that you can export with fertiliser rates. <b>Scouting</b> lets you pin observations and photos on the map. <b>Field report</b> makes a printable PDF.</p>
 <h3>6. Compare dates, growth stage and export</h3>
 <p><b>Compare</b> (map toolbar) shows where the crop improved or declined between two images. The <b>Status</b> tab estimates the growth stage from the sowing date. <b>GeoTIFF</b> in the legend downloads the visible layer for QGIS. Use the search box to jump to a village or coordinates, ◎ for your GPS position, and ← → keys to step through image dates.</p>
+<h3>7. More map tools</h3>
+<p><b>3D</b> drapes the index map on terrain (right-click-drag or two fingers to tilt). The ruler measures distance, area and perimeter. In the field list, <b>Check all</b> fetches the latest clear NDVI for every field, and fields whose NDVI dropped are flagged ⚠. The Weather tab warns about heavy rain, heat and dry spells.</p>
 <h3>Data and privacy</h3>
 <p>Imagery: Copernicus Sentinel-2 L2A from the Earth Search STAC API (AWS Open Data). Weather: Open-Meteo. Place names: OpenStreetMap Nominatim. Your fields and notes are stored only in this browser — use <b>Backup</b> to move them to another device.</p>
 <p class="muted">Limits: Sentinel-2 pixels are 10–20 m, so very small plots (&lt; 0.2 ha) show few pixels. During the rainy season many images are cloudy.</p>`,
@@ -296,6 +320,8 @@ const HELP = {
 <p><b>អាកាសធាតុ</b> បង្ហាញបរិមាណទឹកភ្លៀង សីតុណ្ហភាព សំណើមដី ការព្យាករណ៍ ១៤ ថ្ងៃ និងដឺក្រេ-ថ្ងៃលូតលាស់តាំងពីសាបព្រោះ។ <b>តំបន់</b> បែងចែកស្រែជា ២–៧ តំបន់ផលិតភាព ដែលអាចនាំចេញជាមួយអត្រាជី។ <b>ការតាមដាន</b> អនុញ្ញាតឱ្យដាក់ការសង្កេត និងរូបថតលើផែនទី។ <b>របាយការណ៍ស្រែ</b> បង្កើតឯកសារ PDF សម្រាប់បោះពុម្ព។</p>
 <h3>៦. ប្រៀបធៀបកាលបរិច្ឆេទ ដំណាក់កាលលូតលាស់ និងការនាំចេញ</h3>
 <p><b>ប្រៀបធៀប</b> (របារឧបករណ៍ផែនទី) បង្ហាញកន្លែងដែលដំណាំប្រសើរឡើង ឬធ្លាក់ចុះរវាងរូបភាពពីរ។ ផ្ទាំង <b>ស្ថានភាព</b> ប៉ាន់ស្មានដំណាក់កាលលូតលាស់ពីថ្ងៃសាបព្រោះ។ ប៊ូតុង <b>GeoTIFF</b> ក្នុងតារាងពណ៌ ទាញយកស្រទាប់ដែលកំពុងបង្ហាញសម្រាប់ QGIS។ ប្រើប្រអប់ស្វែងរកដើម្បីទៅភូមិ ឬកូអរដោនេ ◎ សម្រាប់ទីតាំង GPS របស់អ្នក និងគ្រាប់ចុច ← → ដើម្បីប្ដូរកាលបរិច្ឆេទរូបភាព។</p>
+<h3>៧. ឧបករណ៍ផែនទីបន្ថែម</h3>
+<p><b>3D</b> បង្ហាញផែនទីសន្ទស្សន៍លើសណ្ឋានដី (ចុចកណ្ដុរស្ដាំហើយអូស ឬពីរម្រាមដៃ ដើម្បីផ្អៀង)។ បន្ទាត់វាស់ចម្ងាយ ផ្ទៃដី និងបរិមាត្រ។ ក្នុងបញ្ជីស្រែ <b>ពិនិត្យទាំងអស់</b> ទាញយក NDVI ច្បាស់ចុងក្រោយសម្រាប់ស្រែនីមួយៗ ហើយស្រែដែល NDVI ធ្លាក់ចុះត្រូវសម្គាល់ ⚠។ ផ្ទាំងអាកាសធាតុព្រមានអំពីភ្លៀងខ្លាំង កំដៅ និងរាំងស្ងួត។</p>
 <h3>ទិន្នន័យ និងឯកជនភាព</h3>
 <p>រូបភាព៖ Copernicus Sentinel-2 L2A ពី Earth Search STAC API (AWS Open Data)។ អាកាសធាតុ៖ Open-Meteo។ ឈ្មោះទីកន្លែង៖ OpenStreetMap Nominatim។ ស្រែ និងកំណត់ត្រារបស់អ្នករក្សាទុកតែក្នុងកម្មវិធីរុករកនេះប៉ុណ្ណោះ — ប្រើ <b>បម្រុងទុក</b> ដើម្បីផ្ទេរទៅឧបករណ៍ផ្សេង។</p>
 <p class="muted">ដែនកំណត់៖ ភីកសែល Sentinel-2 មានទំហំ ១០–២០ ម៉ែត្រ ដូច្នេះដីតូចៗ (&lt; 0.2 ហិកតា) មានភីកសែលតិច។ នៅរដូវវស្សា រូបភាពជាច្រើនមានពពក។</p>`,

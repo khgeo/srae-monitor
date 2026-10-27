@@ -19,7 +19,10 @@ A free, open-source crop-monitoring web app in the spirit of EOS Crop Monitoring
 | **Compare dates** | Change map between any two images (gain / loss classes with area), for spotting damage, flooding or uneven growth. |
 | **Growth stage** | Estimated crop stage from the sowing date (rice, maize, soybean, mung bean, cassava, sugarcane, vegetables) and expected harvest. |
 | **GeoTIFF export** | Download the visible layer (index, change map, zones or true colour) as a georeferenced GeoTIFF for QGIS. |
-| **Map tools** | Place / coordinate search, GPS "my location", full screen, smooth fractional zoom, ← → keys to step through dates. |
+| **Map engine** | MapLibre GL (GPU-rendered): smooth continuous zoom and pan, rotate and tilt, **3D terrain** view with the index draped on the relief. |
+| **Map tools** | Place / coordinate search, GPS "my location", full screen, distance / area / perimeter measuring, ← → keys to step through dates. |
+| **Portfolio view** | Sort fields by NDVI, NDVI drop or area; **Check all** fetches the latest clear NDVI for every field and flags fields whose NDVI fell (⚠). |
+| **Weather alerts** | Heavy rain, heat stress, dry spell and dry spraying days from the 7-day forecast. |
 | **Installable** | Web-app manifest and icons, so it can be added to a phone home screen. |
 | **Report** | Printable field report (Save as PDF). |
 | **Your data** | Stored in the browser (localStorage). Backup / restore as JSON. |
@@ -50,13 +53,14 @@ cd srae-monitor && python3 -m http.server 8000   # open http://localhost:8000
 Browser ──► Earth Search STAC API (AWS) ──► list of Sentinel-2 scenes for the field
         ──► Sentinel-2 Cloud-Optimized GeoTIFFs (AWS Open Data)  ← HTTP range requests,
             only the tiles covering the field (geotiff.js)
-        ──► index computed per pixel, clouds masked (SCL 3, 8, 9, 10), drawn on Leaflet
+        ──► index computed per pixel, clouds masked (SCL 3, 8, 9, 10), drawn on MapLibre GL
         ──► Open-Meteo (weather), Nominatim (place name)
 ```
 
 | File | Purpose |
 |---|---|
-| `js/app.js` | User interface, map, tabs |
+| `js/app.js` | User interface, tabs |
+| `js/mapview.js` | Map engine: basemaps, 3D terrain, overlays, drawing, editing, measuring |
 | `js/stac.js` | Sentinel-2 scene search (Earth Search STAC) |
 | `js/raster.js` | Reads COG windows, cloud mask, index on the field grid |
 | `js/indices.js` | Index formulas, colour ramps, classes |
@@ -68,7 +72,7 @@ Browser ──► Earth Search STAC API (AWS) ──► list of Sentinel-2 scene
 | `js/stages.js` | Crop growth-stage calendar |
 | `js/tiffwriter.js` | GeoTIFF export |
 
-Libraries (loaded from CDNs): Leaflet 1.9.4, Leaflet.draw 1.0.4, geotiff.js 2.1.3, Chart.js 4.4; shpjs and togeojson load only when you import a Shapefile or KML.
+Libraries (loaded from CDNs): MapLibre GL JS 4.7.1, geotiff.js 2.1.3, Chart.js 4.4; shpjs and togeojson load only when you import a Shapefile or KML.
 
 ## Notes and limits
 
