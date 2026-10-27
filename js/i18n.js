@@ -122,6 +122,7 @@ const en = {
   'alert.dry': 'Dry spell: almost no rain for 10 days and none forecast — consider irrigation.',
   'alert.none': 'No weather warnings for the next 7 days.', 'alert.spray': 'Dry days for spraying or fertilising: {d}',
   'wx.forecast7': '7-day forecast',
+  'map.loadError': 'The map could not load. Please send this message to the developer',
   'demo.name': 'Demo rice field (Battambang)',
   'help.title': 'Help — how to use Srae Monitor',
 };
@@ -245,6 +246,7 @@ const km = {
   'alert.dry': 'រាំងស្ងួត៖ ស្ទើរតែគ្មានភ្លៀង ១០ ថ្ងៃ ហើយគ្មានការព្យាករណ៍ភ្លៀង — គួរពិចារណាស្រោចស្រព។',
   'alert.none': 'គ្មានការព្រមានអាកាសធាតុសម្រាប់ ៧ ថ្ងៃខាងមុខទេ។', 'alert.spray': 'ថ្ងៃស្ងួតសម្រាប់បាញ់ថ្នាំ ឬដាក់ជី៖ {d}',
   'wx.forecast7': 'ព្យាករណ៍ ៧ ថ្ងៃ',
+  'map.loadError': 'ផែនទីមិនអាចផ្ទុកបានទេ។ សូមផ្ញើសារនេះទៅអ្នកអភិវឌ្ឍន៍',
   'demo.name': 'ស្រែស្រូវគំរូ (បាត់ដំបង)',
   'help.title': 'ជំនួយ — របៀបប្រើ Srae Monitor',
 };

@@ -102,6 +102,30 @@ export async function processScene(grid, scene, indexKey, { signal } = {}) {
   const rgb = def.trueColor ? new Uint8ClampedArray(n * 3) : null;
   let valid = 0, cloud = 0, nodata = 0;
   const missing = names.some(b => !wins[b]);
+
+  // Radiometric offset check. Since processing baseline 04.00 ESA adds +1000 to every DN
+  // (BOA_ADD_OFFSET) and the catalogue tells us to subtract 0.1. Some archives already removed it,
+  // which would make dark pixels negative and push NDVI above 1. With the offset present a DN
+  // below 1000 is practically impossible, so if many field pixels are below 1000 we skip it.
+  const offsetFor = {};
+  if (!missing && !def.trueColor) {
+    let noOffset = scene._noOffset;
+    if (noOffset === undefined) {
+      let n = 0, low = 0;
+      const step = Math.max(1, Math.floor(grid.count / 3000));
+      for (let i = 0, k = 0; i < grid.W * grid.H; i++) {
+        if (!grid.inside[i] || (k++ % step)) continue;
+        for (const b of def.bands) {
+          if (!(scene.assets[b].offset < 0)) continue;
+          const raw = sample(wins[b], xy[2 * i], xy[2 * i + 1]);
+          if (raw > 0) { n++; if (raw < 1000) low++; }
+        }
+      }
+      noOffset = n > 20 && low / n > 0.05;
+      scene._noOffset = noOffset;
+    }
+    for (const b of def.bands) offsetFor[b] = noOffset ? 0 : scene.assets[b].offset;
+  }
   const bv = {};
 
   for (let i = 0; i < n; i++) {
@@ -123,11 +147,11 @@ export async function processScene(grid, scene, indexKey, { signal } = {}) {
       const raw = sample(wins[b], x, y);
       const a = scene.assets[b];
       if (!(raw > 0) || raw === a.nodata) { ok = false; break; }
-      bv[b] = raw * a.scale + a.offset;
+      bv[b] = raw * a.scale + offsetFor[b];
     }
     if (!ok) { status[i] = 3; nodata++; continue; }
     const v = def.fn(bv);
-    if (Number.isFinite(v)) { values[i] = v; status[i] = 1; valid++; } else { status[i] = 3; nodata++; }
+    if (Number.isFinite(v) && v >= def.valid[0] && v <= def.valid[1]) { values[i] = v; status[i] = 1; valid++; } else { status[i] = 3; nodata++; }
   }
 
   const covered = grid.count - nodata;

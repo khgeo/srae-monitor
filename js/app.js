@@ -55,6 +55,7 @@ const mv = new MapView('map', {
   onClick: (e) => onMapClick(e),
   onHover: (e) => pixelReadout(e),
   onMoveStart: () => { $('#pixelInfo').hidden = true; },
+  onError: (msg) => toast(`${t('map.loadError')} (${msg})`, 'error', 15000),
 });
 
 function setBasemap(key) {

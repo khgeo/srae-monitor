@@ -11,8 +11,9 @@ const BASEMAP_LAYERS = {
   topo: ['bm-topo'],
 };
 
-function style() {
-  const raster = (tiles, maxzoom, attribution) => ({ type: 'raster', tiles, tileSize: 256, maxzoom, attribution });
+export function style() {
+  // Never put undefined values in the style: MapLibre validates the style and refuses to load it on any error.
+  const raster = (tiles, maxzoom, attribution) => ({ type: 'raster', tiles, tileSize: 256, maxzoom, ...(attribution ? { attribution } : {}) });
   return {
     version: 8,
     sources: {
@@ -76,7 +77,18 @@ export class MapView {
     m.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showCompass: true }), 'top-left');
     m.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
     m.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
-    m.on('load', () => { this._ready = true; this._queue.splice(0).forEach(fn => fn()); this._bindLayerEvents(); });
+    const ready = () => {
+      if (this._ready) return;
+      this._ready = true; clearTimeout(this._watchdog);
+      this._queue.splice(0).forEach(fn => { try { fn(); } catch (err) { console.error(err); } });
+      this._bindLayerEvents();
+    };
+    // 'style.load' fires as soon as the style is parsed; 'load' after the first full render.
+    m.on('style.load', ready);
+    m.on('load', ready);
+    this._watchdog = setTimeout(() => {
+      if (!this._ready && this.opts.onError) this.opts.onError(this._lastError || 'The map style did not load.');
+    }, 12000);
     m.on('click', (e) => this._onClick(e));
     m.on('dblclick', (e) => { if (this.mode === 'draw') { e.preventDefault(); this._finishDraw(); } });
     let pending = null;
@@ -87,7 +99,13 @@ export class MapView {
     m.getCanvas().addEventListener('mouseleave', () => { pending = null; this.opts.onHover && this.opts.onHover(null); });
     m.on('movestart', () => this.opts.onMoveStart && this.opts.onMoveStart());
     m.on('zoom', () => this._labelVisibility());
-    m.on('error', (e) => { if (e && e.error && !/tile|Failed to fetch|AJAXError/i.test(String(e.error.message || e.error))) console.warn(e.error); });
+    m.on('error', (e) => {
+      const msg = String((e && e.error && (e.error.message || e.error)) || e);
+      if (/tile|Failed to fetch|AJAXError|NetworkError|status/i.test(msg)) return; // single tile failures are harmless
+      console.error('Map error:', msg);
+      this._lastError = msg;
+      if (!this._ready && this.opts.onError) this.opts.onError(msg);
+    });
   }
 
   whenReady(fn) { if (this._ready) fn(); else this._queue.push(fn); }

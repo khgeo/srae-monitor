@@ -4,7 +4,7 @@ const KEY = {
   fields: 'srae.fields.v1',
   notes: 'srae.notes.v1',
   settings: 'srae.settings.v1',
-  ts: 'srae.ts.v1',
+  ts: 'srae.ts.v2', // v2: radiometric-offset fix (v1 values may be wrong)
   lang: 'srae.lang',
 };
 
@@ -26,6 +26,8 @@ function write(k, v) {
   try { localStorage.setItem(k, JSON.stringify(v)); return true; }
   catch (e) { console.warn('storage full?', e); return false; }
 }
+
+try { localStorage.removeItem('srae.ts.v1'); } catch { /* ignore */ }
 
 export const store = {
   getFields: () => read(KEY.fields, []),

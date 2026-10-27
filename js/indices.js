@@ -18,16 +18,19 @@ const RAMP_WATER = [
 
 export const INDICES = {
   NDVI: {
+    valid: [-1, 1],
     bands: ['red', 'nir'], min: -0.1, max: 0.95, ramp: RAMP_VEG,
     fn: (b) => (b.nir - b.red) / (b.nir + b.red),
     bins: [-1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
   },
   EVI: {
+    valid: [-1, 2.5],
     bands: ['blue', 'red', 'nir'], min: -0.1, max: 0.9, ramp: RAMP_VEG,
     fn: (b) => 2.5 * (b.nir - b.red) / (b.nir + 6 * b.red - 7.5 * b.blue + 1),
     bins: [-1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.5],
   },
   MSAVI: {
+    valid: [-1, 1],
     bands: ['red', 'nir'], min: -0.1, max: 0.9, ramp: RAMP_VEG,
     fn: (b) => {
       const t = 2 * b.nir + 1;
@@ -36,21 +39,25 @@ export const INDICES = {
     bins: [-1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1],
   },
   NDRE: {
+    valid: [-1, 1],
     bands: ['rededge1', 'nir'], min: -0.05, max: 0.6, ramp: RAMP_VEG,
     fn: (b) => (b.nir - b.rededge1) / (b.nir + b.rededge1),
     bins: [-1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 1],
   },
   ReCI: {
+    valid: [-1, 30],
     bands: ['rededge1', 'nir'], min: 0, max: 5, ramp: RAMP_VEG,
     fn: (b) => b.nir / b.rededge1 - 1,
     bins: [-10, 0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 50],
   },
   NDMI: {
+    valid: [-1, 1],
     bands: ['nir08', 'swir16'], min: -0.3, max: 0.5, ramp: RAMP_MOIST,
     fn: (b) => (b.nir08 - b.swir16) / (b.nir08 + b.swir16),
     bins: [-1, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4, 1],
   },
   NDWI: {
+    valid: [-1, 1],
     bands: ['green', 'nir'], min: -0.6, max: 0.4, ramp: RAMP_WATER,
     fn: (b) => (b.green - b.nir) / (b.green + b.nir),
     bins: [-1, -0.5, -0.3, -0.1, 0, 0.1, 0.3, 1],
