@@ -2,7 +2,7 @@
 import { t, setLang, getLang, applyI18n, fmtDate, cropName, CROPS, NOTE_CATS, indexName, helpHtml } from './i18n.js';
 import { store, uid } from './store.js';
 import * as geo from './geo.js';
-import { INDICES, INDEX_ORDER, valueColor, cssColor, gradientCss } from './indices.js';
+import { INDICES, INDEX_ORDER, valueColor, cssColor, gradientCss, rampColor } from './indices.js';
 import { searchScenes } from './stac.js';
 import { processScene, mapLimit } from './raster.js';
 import { breaks, classify, majority, zoneStats, vectorise, zoneColors } from './zones.js';
@@ -10,6 +10,8 @@ import { getWeather, accumulate, getElevation, getPlaceName } from './weather.js
 import { $, $$, h, esc, toast, openModal, closeModal, confirmBox, download, slug, loadScript } from './ui.js';
 import { indexChart, weatherChart, accumChart, soilChart, getChart, destroyChart, ts } from './charts.js';
 import { openReport } from './report.js';
+import { writeGeoTiff } from './tiffwriter.js';
+import { growthStage, STAGE_COLORS } from './stages.js';
 
 const DAY = 86400000;
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -39,6 +41,7 @@ const S = {
   editing: null,
   resultCache: new Map(),
   legendCollapsed: window.matchMedia('(max-width: 860px)').matches,
+  compare: { on: false, idx: -1, diff: null },
 };
 
 const fieldById = (id) => S.fields.find(f => f.id === id);
@@ -47,17 +50,24 @@ const saveFields = () => store.saveFields(S.fields);
 const saveNotes = () => { if (!store.saveNotes(S.notes)) toast(t('msg.storageFull'), 'error'); };
 
 // ---------------------------------------------------------------- map
-const map = L.map('map', { zoomControl: false, attributionControl: true, preferCanvas: false }).setView([12.65, 104.9], 7);
+// Fractional zoom + gentler wheel steps make zooming feel continuous instead of jumping a whole level.
+const map = L.map('map', {
+  zoomControl: false, attributionControl: true, preferCanvas: false,
+  zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 120, wheelDebounceTime: 20,
+  zoomAnimation: true, fadeAnimation: true, markerZoomAnimation: true, inertia: true, maxZoom: 20,
+}).setView([12.65, 104.9], 7);
+// Keep extra tiles around the view and do not request intermediate levels mid-animation.
+const TILE_OPTS = { keepBuffer: 6, updateWhenZooming: false, updateWhenIdle: false, maxZoom: 20 };
 L.control.zoom({ position: 'topleft' }).addTo(map);
 L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
 
 const BASEMAPS = {
   satellite: L.layerGroup([
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }),
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, opacity: 0.85 }),
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { ...TILE_OPTS, maxNativeZoom: 18, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }),
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { ...TILE_OPTS, maxNativeZoom: 18, opacity: 0.85 }),
   ]),
-  streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }),
-  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap (CC-BY-SA), © OpenStreetMap' }),
+  streets: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { ...TILE_OPTS, maxNativeZoom: 19, attribution: '© OpenStreetMap contributors' }),
+  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { ...TILE_OPTS, maxNativeZoom: 17, attribution: '© OpenTopoMap (CC-BY-SA), © OpenStreetMap' }),
 };
 let basemap = null;
 function setBasemap(key) {
@@ -292,7 +302,7 @@ function hideHint() { $('#drawHint').hidden = true; }
 function showList() {
   S.gen++; if (S.abort) S.abort.abort();
   stopTs();
-  S.sel = null; S.scenes = []; S.result = null; S.zones = null; S.showZones = false;
+  S.sel = null; S.scenes = []; S.result = null; S.zones = null; S.showZones = false; S.compare.idx = -1; S.compare.diff = null;
   clearOverlay();
   $('#viewField').hidden = true; $('#viewList').hidden = false;
   $('#timeline').hidden = true; $('#legend').hidden = true;
@@ -307,7 +317,7 @@ function selectField(id, { force = false } = {}) {
   S.gen++; if (S.abort) S.abort.abort();
   stopTs();
   S.abort = new AbortController();
-  S.sel = id; S.scenes = []; S.sceneIdx = -1; S.result = null; S.zones = null; S.showZones = false;
+  S.sel = id; S.scenes = []; S.sceneIdx = -1; S.result = null; S.zones = null; S.showZones = false; S.compare.idx = -1; S.compare.diff = null;
   clearOverlay();
   S.grid = geo.makeGrid(f.geometry);
   if (S.grid.count === 0) S.grid = geo.makeGrid(f.geometry, 5);
@@ -406,6 +416,8 @@ async function showScene(i) {
     if (gen !== S.gen || S.sceneIdx !== i) return;
     S.result = r;
     S.showZones = false;
+    if (S.compare.on) await updateCompare();
+    if (gen !== S.gen || S.sceneIdx !== i) return;
     drawResult();
     renderLegend();
     updateTimelineValues();
@@ -468,7 +480,7 @@ function clearOverlay() {
   if (S.overlay) { map.removeLayer(S.overlay); S.overlay = null; }
 }
 
-function canvasFor(res, zoneCls) {
+function canvasFor(res, zoneCls, colorFn) {
   const g = S.grid;
   const c = document.createElement('canvas');
   c.width = g.W; c.height = g.H;
@@ -485,7 +497,7 @@ function canvasFor(res, zoneCls) {
     }
     if (st === 1 && !zoneCls) {
       if (res.rgb) { img.data[k] = res.rgb[i * 3]; img.data[k + 1] = res.rgb[i * 3 + 1]; img.data[k + 2] = res.rgb[i * 3 + 2]; }
-      else { const col = valueColor(res.indexKey, res.values[i]); img.data[k] = col[0]; img.data[k + 1] = col[1]; img.data[k + 2] = col[2]; }
+      else { const col = colorFn ? colorFn(res.values[i]) : valueColor(res.indexKey, res.values[i]); img.data[k] = col[0]; img.data[k + 1] = col[1]; img.data[k + 2] = col[2]; }
       img.data[k + 3] = 255;
     } else if (st === 2) {
       const row = Math.floor(i / g.W), col = i % g.W;
@@ -499,11 +511,18 @@ function canvasFor(res, zoneCls) {
   return c;
 }
 
+/** Canvas for whatever layer is active: zones, change map or index. */
+function currentCanvas() {
+  if (S.showZones && S.zones) return canvasFor(S.result, S.zones.cls);
+  if (compareActive()) return canvasFor(S.compare.diff, null, diffColor);
+  return canvasFor(S.result, null);
+}
+
 function drawResult() {
   clearOverlay();
   if (!S.result) return;
   const g = S.grid;
-  const cv = canvasFor(S.result, S.showZones && S.zones ? S.zones.cls : null);
+  const cv = currentCanvas();
   S.overlay = L.imageOverlay(cv.toDataURL(), [[g.south, g.west], [g.north, g.east]], { opacity: S.settings.opacity, className: 'idx-overlay', interactive: false }).addTo(map);
   const l = layerById.get(S.sel); if (l) l.bringToFront();
 }
@@ -515,10 +534,14 @@ function renderLegend() {
   if (!r || !sc) { lg.hidden = true; return; }
   lg.hidden = false;
   const clear = Math.round(r.validFrac * 100), cloud = Math.round((r.cloud / (r.inside || 1)) * 100);
-  const head = `<div class="lg-head"><b>${S.showZones ? t('zones.title') : esc(indexName(S.index))}</b><span>${fmtDate(sc.date)} · Sentinel-2${sc.platform ? ` ${esc(sc.platform.slice(-1).toUpperCase())}` : ''}</span>
+  const cmp = compareActive();
+  const title = S.showZones ? t('zones.title') : cmp ? t('cmp.title', { idx: S.index }) : esc(indexName(S.index));
+  const sub = cmp ? `${fmtDate(S.scenes[S.compare.idx].date)} → ${fmtDate(sc.date)}` : `${fmtDate(sc.date)} · Sentinel-2${sc.platform ? ` ${esc(sc.platform.slice(-1).toUpperCase())}` : ''}`;
+  const head = `<div class="lg-head"><b>${title}</b><span>${sub}</span>
     <button class="icon-btn sm" id="lgToggle" aria-label="${esc(t('ui.collapse'))}">▾</button></div>`;
   let body = '';
-  if (S.showZones && S.zones) {
+  if (S.compare.on && !S.showZones) body = compareLegendBody();
+  else if (S.showZones && S.zones) {
     const zc = zoneColors(S.zones.n);
     body = `<table class="bins">${S.zones.stats.map((z, k) => `<tr><td><i style="background:${cssColor(zc[k])}"></i>${t('zones.zone')} ${z.zone}</td><td>${Number.isFinite(z.mean) ? z.mean.toFixed(2) : '—'}</td><td>${z.areaHa.toFixed(2)} ${t('unit.ha')}</td><td>${z.pct.toFixed(0)}%</td></tr>`).join('')}</table>`;
   } else if (S.index === 'TRUE') {
@@ -542,15 +565,24 @@ function renderLegend() {
     body = `<p class="muted small">${t('legend.noValid')}</p>`;
   }
   lg.innerHTML = `${head}<div class="lg-body">${body}
-    <div class="lg-foot"><span><i class="sw clear"></i>${t('legend.clear')} ${clear}%</span><span><i class="sw cloud"></i>${t('legend.cloud')} ${cloud}%</span></div></div>`;
+    <div class="lg-foot"><span><i class="sw clear"></i>${t('legend.clear')} ${clear}%</span><span><i class="sw cloud"></i>${t('legend.cloud')} ${cloud}%</span>
+      <button class="btn sm dl" id="lgTiff" title="${esc(t('legend.geotiffTitle'))}"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>GeoTIFF</button></div></div>`;
   lg.classList.toggle('collapsed', !!S.legendCollapsed);
+  $('#lgTiff').onclick = exportGeoTiff;
+  const cs = $('#cmpWith');
+  if (cs) cs.onchange = async () => { S.compare.idx = +cs.value; setMapLoading(true); try { await updateCompare(); drawResult(); renderLegend(); } finally { setMapLoading(false); } };
   $('#lgToggle').onclick = () => { S.legendCollapsed = !S.legendCollapsed; lg.classList.toggle('collapsed', S.legendCollapsed); };
 }
 
 function fmtNum(v) { return Math.abs(v) >= 10 ? v.toFixed(0) : (Math.round(v * 100) / 100).toString(); }
 
 // pixel readout
+let hoverEvt = null;
 map.on('mousemove', (e) => {
+  if (!hoverEvt) requestAnimationFrame(() => { const ev = hoverEvt; hoverEvt = null; pixelReadout(ev); });
+  hoverEvt = e;
+});
+function pixelReadout(e) {
   const box = $('#pixelInfo');
   const r = S.result, g = S.grid;
   if (!r || !g || S.drawing || S.editing) { box.hidden = true; return; }
@@ -559,7 +591,9 @@ map.on('mousemove', (e) => {
   const i = row * g.W + col, st = r.status[i];
   if (!st) { box.hidden = true; return; }
   let txt;
-  if (S.showZones && S.zones && S.zones.cls[i]) txt = `${t('zones.zone')} ${S.zones.cls[i]}${Number.isFinite(r.values[i]) ? ` · ${r.values[i].toFixed(3)}` : ''}`;
+  const dv = compareActive() && !S.showZones ? S.compare.diff.values[i] : NaN;
+  if (Number.isFinite(dv)) txt = `Δ ${S.index} ${dv > 0 ? '+' : ''}${dv.toFixed(3)}`;
+  else if (S.showZones && S.zones && S.zones.cls[i]) txt = `${t('zones.zone')} ${S.zones.cls[i]}${Number.isFinite(r.values[i]) ? ` · ${r.values[i].toFixed(3)}` : ''}`;
   else if (st === 2) txt = t('legend.cloud');
   else if (st === 3) txt = t('legend.nodata');
   else if (r.rgb) txt = `RGB ${r.rgb[i * 3]}, ${r.rgb[i * 3 + 1]}, ${r.rgb[i * 3 + 2]}`;
@@ -567,8 +601,9 @@ map.on('mousemove', (e) => {
   box.textContent = txt;
   box.style.left = `${e.containerPoint.x + 14}px`; box.style.top = `${e.containerPoint.y + 14}px`;
   box.hidden = false;
-});
-map.on('mouseout', () => { $('#pixelInfo').hidden = true; });
+}
+map.on('mouseout', () => { hoverEvt = null; $('#pixelInfo').hidden = true; });
+map.on('zoomstart movestart', () => { $('#pixelInfo').hidden = true; });
 
 // ---------------------------------------------------------------- tabs
 const TABS = ['overview', 'chart', 'weather', 'zones', 'notes'];
@@ -613,6 +648,7 @@ function renderOverview(body, f) {
     ${last ? `<div class="card status"><h3>${t('ov.status')}</h3><p>${statusText(last.mean, last.std && last.mean ? last.std / last.mean : null)}</p>
       ${recs.length > 1 ? '<div class="spark-wrap"><canvas id="spark" height="70"></canvas></div>' : ''}
       <button class="btn sm" data-act="chart">${t('ov.openChart')}</button></div>` : ''}
+    ${stageCard(f)}
     <div class="card" id="ovWeather"><h3>${t('ov.weather')}</h3><p class="muted small"><span class="spinner"></span> ${t('ui.loading')}</p></div>
     <div class="card"><h3>${t('ov.info')}</h3>
       <dl class="info">
@@ -797,6 +833,7 @@ function drawTsChart() {
   const markers = [];
   if (f.sowing) markers.push({ x: ts(f.sowing), label: t('field.sowing'), color: '#2e7d4f' });
   if (f.harvest) markers.push({ x: ts(f.harvest), label: t('field.harvest'), color: '#b26a00' });
+  else { const gs = growthStage(f.crop, f.sowing, null, todayIso()); if (gs) markers.push({ x: ts(gs.harvestIso), label: t('stage.harvestShort'), color: '#b26a00', dash: [2, 3] }); }
   const d = INDICES[idx];
   indexChart(cv, {
     label: `${idx} (${t('chart.mean')})`, points: pts, prev, prevLabel: t('chart.prevYear'), color: '#2e7d4f', markers,
@@ -1136,7 +1173,8 @@ async function makeReport() {
   const recs = latestTs(f.id, tsIndex()).slice(0, 12);
   openReport({
     t, fmtDate, field: f, area: geo.fmtArea(f.areaM2), crop: cropName(f.crop), index: S.index, indexName: indexName(S.index),
-    scene: sc, result: S.result, mapImg, mapIsZones: !!(S.showZones && S.zones), chartImg: chart ? chart.toBase64Image() : null, wx, gddBase: S.settings.gddBase,
+    scene: sc, result: S.result, mapImg, mapIsZones: !!(S.showZones && S.zones), mapTitle: compareActive() ? `${t('cmp.title', { idx: S.index })} (${fmtDate(S.scenes[S.compare.idx].date)} → ${sc ? fmtDate(sc.date) : ''})` : null,
+    stage: (() => { const gs = growthStage(f.crop, f.sowing, f.harvest, todayIso()); return gs ? stageSummary(gs) : null; })(), chartImg: chart ? chart.toBase64Image() : null, wx, gddBase: S.settings.gddBase,
     zones: S.zones, zoneColors: S.zones ? zoneColors(S.zones.n).map(c => cssColor(c)) : null,
     recs, notes: S.notes.filter(n => n.fieldId === f.id), pixelHa: S.grid.pixelAreaM2 / 10000,
     colorFor: (v) => cssColor(valueColor(tsIndex(), v)),
@@ -1144,7 +1182,7 @@ async function makeReport() {
 }
 
 function reportCanvas() {
-  const g = S.grid; const src = canvasFor(S.result, S.showZones && S.zones ? S.zones.cls : null);
+  const g = S.grid; const src = currentCanvas();
   const k = Math.max(1, Math.floor(600 / Math.max(g.W, g.H)));
   const c = document.createElement('canvas'); c.width = g.W * k + 20; c.height = g.H * k + 20;
   const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
@@ -1216,6 +1254,7 @@ $('#indexSelect').addEventListener('change', (e) => {
   S.index = e.target.value;
   e.target.title = t(`idxd.${S.index}`);
   S.showZones = false;
+  if (S.index === 'TRUE' && S.compare.on) setCompare(false);
   updateTimelineValues();
   if (S.sceneIdx >= 0) showScene(S.sceneIdx);
   if (S.tab === 'chart' || S.tab === 'zones') renderTab();
@@ -1225,6 +1264,197 @@ $('#opacity').addEventListener('change', () => store.saveSettings(S.settings));
 $('#basemapSelect').addEventListener('change', (e) => setBasemap(e.target.value));
 $('#tlPrev').addEventListener('click', () => { if (S.sceneIdx < S.scenes.length - 1) showScene(S.sceneIdx + 1); });
 $('#tlNext').addEventListener('click', () => { if (S.sceneIdx > 0) showScene(S.sceneIdx - 1); });
+
+
+// ---------------------------------------------------------------- compare two dates (change map)
+const DIFF_RAMP = [[0, [127, 39, 4]], [0.25, [217, 95, 14]], [0.42, [254, 217, 142]], [0.5, [246, 245, 238]], [0.58, [199, 233, 192]], [0.75, [65, 171, 93]], [1, [0, 90, 50]]];
+const DIFF_CLASSES = [[-Infinity, -0.2, 'strongDec'], [-0.2, -0.1, 'dec'], [-0.1, -0.03, 'slightDec'], [-0.03, 0.03, 'stable'], [0.03, 0.1, 'slightInc'], [0.1, 0.2, 'inc'], [0.2, Infinity, 'strongInc']];
+const diffColor = (d) => rampColor(DIFF_RAMP, (d + 0.3) / 0.6);
+const compareActive = () => !!(S.compare.on && S.compare.diff && S.compare.idx >= 0 && S.scenes[S.compare.idx]);
+
+function defaultCompareIdx() {
+  const cache = store.getTs(S.sel, S.index);
+  const cur = S.scenes[S.sceneIdx];
+  for (let j = S.sceneIdx + 1; j < S.scenes.length; j++) {
+    const r = cache[S.scenes[j].id];
+    if (r && r.valid >= 0.7 && daysBetween(S.scenes[j].date, cur.date) >= 5) return j;
+  }
+  for (let j = S.sceneIdx + 1; j < S.scenes.length; j++) if ((S.scenes[j].cloud ?? 100) < 30) return j;
+  return S.sceneIdx + 1 < S.scenes.length ? S.sceneIdx + 1 : -1;
+}
+
+async function updateCompare() {
+  S.compare.diff = null;
+  if (!S.compare.on || !S.result || S.index === 'TRUE') return;
+  let j = S.compare.idx;
+  if (j < 0 || j === S.sceneIdx || !S.scenes[j]) j = defaultCompareIdx();
+  S.compare.idx = j;
+  if (j < 0) return;
+  const r0 = await getResult(S.scenes[j], S.index);
+  const r1 = S.result;
+  const n = r1.values.length;
+  const values = new Float32Array(n).fill(NaN);
+  const status = new Uint8Array(n);
+  let valid = 0, sum = 0;
+  const counts = DIFF_CLASSES.map(() => 0);
+  for (let i = 0; i < n; i++) {
+    const a = r1.status[i], b = r0.status[i];
+    if (!a) continue;
+    if (a === 1 && b === 1) {
+      const d = r1.values[i] - r0.values[i];
+      values[i] = d; status[i] = 1; valid++; sum += d;
+      counts[DIFF_CLASSES.findIndex(([lo, hi]) => d >= lo && d < hi)]++;
+    } else status[i] = (a === 2 || b === 2) ? 2 : 3;
+  }
+  S.compare.diff = { values, status, rgb: null, indexKey: S.index, valid, mean: valid ? sum / valid : NaN, counts };
+}
+
+function compareLegendBody() {
+  if (S.index === 'TRUE') return `<p class="muted small">${t('cmp.trueColor')}</p>`;
+  const d = S.compare.diff;
+  const opts = S.scenes.map((sc, j) => j === S.sceneIdx ? '' : `<option value="${j}" ${j === S.compare.idx ? 'selected' : ''}>${fmtDate(sc.date)} · ☁ ${Math.round(sc.cloud ?? 0)}%</option>`).join('');
+  const pick = `<label class="cmp-pick">${t('cmp.with')}<select id="cmpWith">${opts}</select></label>`;
+  if (!d) return pick;
+  if (!d.valid) return `${pick}<p class="muted small">${t('cmp.noOverlap')}</p>`;
+  const ha = S.grid.pixelAreaM2 / 10000;
+  const max = Math.max(...d.counts, 1);
+  const rows = DIFF_CLASSES.map(([lo, hi, key], k) => {
+    const mid = Number.isFinite(lo) && Number.isFinite(hi) ? (lo + hi) / 2 : (Number.isFinite(lo) ? lo + 0.05 : hi - 0.05);
+    return `<tr><td><i style="background:${cssColor(diffColor(mid))}"></i>${t(`cmp.${key}`)}</td>
+      <td class="bar"><span style="width:${(100 * d.counts[k] / max).toFixed(0)}%"></span></td>
+      <td>${(d.counts[k] * ha).toFixed(2)} ${t('unit.ha')}</td><td>${((100 * d.counts[k]) / d.valid).toFixed(0)}%</td></tr>`;
+  }).reverse().join('');
+  const m = d.mean;
+  return `${pick}<div class="ramp" style="background:linear-gradient(90deg, ${DIFF_RAMP.map(([p, c]) => `${cssColor(c)} ${p * 100}%`).join(', ')})"></div>
+    <div class="ramp-l"><span>−0.3</span><span>0</span><span>+0.3</span></div>
+    <div class="lg-stats"><span>${t('cmp.mean')} <b class="${m > 0.03 ? 'up' : m < -0.03 ? 'down' : ''}">${m > 0 ? '+' : ''}${m.toFixed(3)}</b></span></div>
+    <table class="bins">${rows}</table>`;
+}
+
+async function setCompare(on) {
+  S.compare.on = on;
+  $('#btnCompare').classList.toggle('active', on);
+  $('#btnCompare').setAttribute('aria-pressed', on);
+  if (on && S.index === 'TRUE') { toast(t('cmp.trueColor'), 'warn'); }
+  if (on) S.showZones = false;
+  if (!S.result) return;
+  if (on) { setMapLoading(true); try { await updateCompare(); } catch (e) { console.error(e); toast(t('scenes.loadError'), 'error'); } finally { setMapLoading(false); } }
+  drawResult(); renderLegend();
+}
+
+// ---------------------------------------------------------------- GeoTIFF export of the visible layer
+function exportGeoTiff() {
+  const f = selField(); const r = S.result; const g = S.grid; const sc = S.scenes[S.sceneIdx];
+  if (!f || !r || !sc) return;
+  const base = { width: g.W, height: g.H, west: g.west, north: g.north, dLon: g.dLon, dLat: g.dLat };
+  let buf, name;
+  if (S.showZones && S.zones) {
+    const z = new Float32Array(g.W * g.H).map((_, i) => S.zones.cls[i] || NaN);
+    buf = writeGeoTiff({ ...base, bands: [z], nodata: 'nan' }); name = `${slug(f.name)}_zones_${sc.date}.tif`;
+  } else if (compareActive()) {
+    buf = writeGeoTiff({ ...base, bands: [S.compare.diff.values], nodata: 'nan' });
+    name = `${slug(f.name)}_${S.index}_change_${S.scenes[S.compare.idx].date}_${sc.date}.tif`;
+  } else if (r.rgb) {
+    const n = g.W * g.H; const bands = [0, 1, 2].map(b => new Uint8Array(n).map((_, i) => r.status[i] === 1 ? r.rgb[i * 3 + b] : 0));
+    buf = writeGeoTiff({ ...base, bands, type: 'uint8', nodata: '0' }); name = `${slug(f.name)}_truecolor_${sc.date}.tif`;
+  } else {
+    buf = writeGeoTiff({ ...base, bands: [r.values], nodata: 'nan' }); name = `${slug(f.name)}_${S.index}_${sc.date}.tif`;
+  }
+  download(name, new Blob([buf], { type: 'image/tiff' }));
+}
+
+// ---------------------------------------------------------------- growth stage
+function stageSummary(gs) {
+  if (gs.day < 0) return t('stage.beforeSowing', { n: -gs.day });
+  if (gs.current >= gs.stages.length) return t('stage.done');
+  return `${t(`stage.${gs.stages[gs.current].key}`)} · ${t('stage.day', { n: gs.day })}`;
+}
+
+function stageCard(f) {
+  if (!f.sowing) return STAGE_CROPS.has(f.crop) ? `<div class="card"><h3>${t('stage.title')}</h3><p class="muted small">${t('stage.noSowing')} <button class="link" data-act="edit">${t('ov.setSowing')}</button></p></div>` : '';
+  const gs = growthStage(f.crop, f.sowing, f.harvest, todayIso());
+  if (!gs) return '';
+  const pos = Math.max(0, Math.min(100, (100 * gs.day) / gs.total));
+  const toHarvest = daysBetween(todayIso(), gs.harvestIso);
+  return `<div class="card stage"><h3>${t('stage.title')}</h3>
+    <p class="stage-now"><b>${esc(stageSummary(gs))}</b></p>
+    <div class="stage-bar" role="img" aria-label="${esc(stageSummary(gs))}">
+      ${gs.stages.map((s, i) => `<span class="seg ${i === gs.current ? 'cur' : ''}" style="flex:${Math.max(s.end - s.start, 1)};background:${STAGE_COLORS[s.key]}" title="${esc(t(`stage.${s.key}`))}: ${s.start}–${s.end}"></span>`).join('')}
+      ${gs.day >= 0 ? `<i class="today" style="left:${pos}%"></i>` : ''}
+    </div>
+    <div class="stage-legend">${gs.stages.map((s, i) => `<span class="${i === gs.current ? 'cur' : ''}"><i style="background:${STAGE_COLORS[s.key]}"></i>${t(`stage.${s.key}`)}</span>`).join('')}</div>
+    <p class="muted small">${f.harvest ? t('field.harvest') + ': ' + fmtDate(f.harvest) : t('stage.expected', { d: fmtDate(gs.harvestIso) })}${toHarvest > 0 ? ` (${t('ov.inDays', { n: toHarvest })})` : ''} · ${t('stage.note')}</p></div>`;
+}
+const STAGE_CROPS = new Set(['rice_wet', 'rice_dry', 'maize', 'soybean', 'mungbean', 'cassava', 'sugarcane', 'vegetables']);
+
+// ---------------------------------------------------------------- place search, location, full screen
+const searchLayer = L.layerGroup().addTo(map);
+function parseLatLon(q) {
+  const m = q.trim().match(/^(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  let a = +m[1], b = +m[2];
+  if (Math.abs(a) > 90 && Math.abs(b) <= 90) [a, b] = [b, a];
+  if (Math.abs(a) > 90 || Math.abs(b) > 180) return null;
+  return [a, b];
+}
+
+function showSearchPin(lat, lon, label) {
+  searchLayer.clearLayers();
+  L.circleMarker([lat, lon], { radius: 8, color: '#fff', weight: 3, fillColor: '#e0593c', fillOpacity: 1 }).bindTooltip(esc(label || `${lat.toFixed(5)}, ${lon.toFixed(5)}`), { permanent: false }).addTo(searchLayer);
+}
+
+async function placeSearch(q) {
+  const list = $('#placeResults');
+  q = q.trim(); if (!q) { list.hidden = true; return; }
+  const ll = parseLatLon(q);
+  if (ll) { map.flyTo(ll, 16, { duration: 1.2 }); showSearchPin(ll[0], ll[1]); list.hidden = true; return; }
+  list.innerHTML = `<li class="muted"><span class="spinner"></span></li>`; list.hidden = false;
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}&accept-language=${getLang() === 'km' ? 'km,en' : 'en'}`);
+    const res = r.ok ? await r.json() : [];
+    if (!res.length) { list.innerHTML = `<li class="muted">${t('map.noResults')}</li>`; return; }
+    list.innerHTML = '';
+    for (const p of res) {
+      const li = h(`<li tabindex="0">${esc(p.display_name)}</li>`);
+      const go = () => {
+        list.hidden = true;
+        const bb = p.boundingbox && p.boundingbox.map(Number);
+        if (bb && bb[1] - bb[0] > 0.002) map.flyToBounds([[bb[0], bb[2]], [bb[1], bb[3]]], { duration: 1.2, maxZoom: 16 });
+        else map.flyTo([+p.lat, +p.lon], 16, { duration: 1.2 });
+        showSearchPin(+p.lat, +p.lon, p.display_name);
+      };
+      li.addEventListener('click', go); li.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      list.appendChild(li);
+    }
+  } catch { list.innerHTML = `<li class="muted">${t('map.noResults')}</li>`; }
+}
+
+function locateMe() {
+  if (!navigator.geolocation) return toast(t('map.locError'), 'error');
+  const btn = $('#btnLocate'); btn.classList.add('busy');
+  navigator.geolocation.getCurrentPosition((pos) => {
+    btn.classList.remove('busy');
+    const { latitude: lat, longitude: lon, accuracy } = pos.coords;
+    searchLayer.clearLayers();
+    L.circle([lat, lon], { radius: Math.min(accuracy, 2000), color: '#3b7dd8', weight: 1, fillOpacity: 0.12 }).addTo(searchLayer);
+    L.circleMarker([lat, lon], { radius: 7, color: '#fff', weight: 3, fillColor: '#3b7dd8', fillOpacity: 1 }).addTo(searchLayer);
+    map.flyTo([lat, lon], Math.max(map.getZoom(), 16), { duration: 1.2 });
+  }, () => { btn.classList.remove('busy'); toast(t('map.locError'), 'error'); }, { enableHighAccuracy: true, timeout: 15000 });
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.();
+}
+document.addEventListener('fullscreenchange', () => { $('#btnFull').classList.toggle('active', !!document.fullscreenElement); setTimeout(() => map.invalidateSize(), 150); });
+if (!document.documentElement.requestFullscreen) $('#btnFull').hidden = true;
+
+$('#placeSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); placeSearch(e.target.value); } if (e.key === 'Escape') $('#placeResults').hidden = true; });
+$('#placeGo').addEventListener('click', () => placeSearch($('#placeSearch').value));
+document.addEventListener('click', (e) => { if (!e.target.closest('.map-search')) $('#placeResults').hidden = true; });
+$('#btnLocate').addEventListener('click', locateMe);
+$('#btnFull').addEventListener('click', toggleFullscreen);
+$('#btnCompare').addEventListener('click', () => setCompare(!S.compare.on));
 
 // ---------------------------------------------------------------- wiring
 $('#btnDraw').addEventListener('click', startDraw);
@@ -1246,6 +1476,11 @@ $('#editSave').addEventListener('click', () => finishEditShape(true));
 $('#editCancel').addEventListener('click', () => finishEditShape(false));
 $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal' || e.target.closest('[data-close]')) closeModal(); });
 document.addEventListener('keydown', (e) => {
+  const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || '');
+  if (!typing && $('#modal').hidden && S.sel && S.scenes.length) {
+    if (e.key === 'ArrowLeft' && S.sceneIdx < S.scenes.length - 1) { e.preventDefault(); showScene(S.sceneIdx + 1); return; }
+    if (e.key === 'ArrowRight' && S.sceneIdx > 0) { e.preventDefault(); showScene(S.sceneIdx - 1); return; }
+  }
   if (e.key !== 'Escape') return;
   if (!$('#modal').hidden) closeModal(); else stopModes();
 });

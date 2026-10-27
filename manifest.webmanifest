@@ -1,0 +1,17 @@
+{
+  "name": "Srae Monitor — Satellite crop monitoring",
+  "short_name": "Srae Monitor",
+  "description": "Sentinel-2 crop monitoring: NDVI maps, field history, weather, productivity zones and scouting.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b3526",
+  "theme_color": "#1f3a2b",
+  "lang": "en",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

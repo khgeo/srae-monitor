@@ -16,13 +16,18 @@ A free, open-source crop-monitoring web app in the spirit of EOS Crop Monitoring
 | **Weather** | Open-Meteo: 30-day history + 14-day forecast, rainfall, temperature, soil moisture, ET₀, growing degree days and rain since sowing. |
 | **Productivity zones** | 2–7 zones (quantile, equal interval or k-means) from one image or the average of the best images, smoothing, per-zone rates, GeoJSON/CSV export for VRA. |
 | **Scouting** | Pin observations (pests, disease, weeds, water, nutrients) with photos; export as GeoJSON. |
+| **Compare dates** | Change map between any two images (gain / loss classes with area), for spotting damage, flooding or uneven growth. |
+| **Growth stage** | Estimated crop stage from the sowing date (rice, maize, soybean, mung bean, cassava, sugarcane, vegetables) and expected harvest. |
+| **GeoTIFF export** | Download the visible layer (index, change map, zones or true colour) as a georeferenced GeoTIFF for QGIS. |
+| **Map tools** | Place / coordinate search, GPS "my location", full screen, smooth fractional zoom, ← → keys to step through dates. |
+| **Installable** | Web-app manifest and icons, so it can be added to a phone home screen. |
 | **Report** | Printable field report (Save as PDF). |
 | **Your data** | Stored in the browser (localStorage). Backup / restore as JSON. |
 
 ## Publish on GitHub Pages (5 minutes)
 
 1. Create a new repository on GitHub, e.g. `srae-monitor` (public).
-2. Upload the contents of this folder (`index.html`, `css/`, `js/`, `assets/`, `.nojekyll`, `README.md`) to the repository root — **Add file → Upload files**, or with git:
+2. Upload the contents of this folder (`index.html`, `manifest.webmanifest`, `css/`, `js/`, `assets/`, `.nojekyll`, `README.md`) to the repository root — **Add file → Upload files**, or with git:
    ```bash
    git init && git add . && git commit -m "Srae Monitor"
    git branch -M main
@@ -60,6 +65,8 @@ Browser ──► Earth Search STAC API (AWS) ──► list of Sentinel-2 scene
 | `js/geo.js` | UTM projection, area, point-in-polygon |
 | `js/i18n.js` | English and Khmer text (add more languages here) |
 | `js/report.js` | Printable report |
+| `js/stages.js` | Crop growth-stage calendar |
+| `js/tiffwriter.js` | GeoTIFF export |
 
 Libraries (loaded from CDNs): Leaflet 1.9.4, Leaflet.draw 1.0.4, geotiff.js 2.1.3, Chart.js 4.4; shpjs and togeojson load only when you import a Shapefile or KML.
 

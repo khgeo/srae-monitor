@@ -98,6 +98,19 @@ const en = {
 
   'report.title': 'Field monitoring report', 'report.print': 'Print / Save as PDF', 'report.history': 'Vegetation index history',
   'report.sources': 'Sources: Copernicus Sentinel-2 L2A via Earth Search (AWS Open Data), Open-Meteo weather. Generated with Srae Monitor.',
+  'map.searchPh': 'Search place or lat, lon', 'map.search': 'Search', 'map.locate': 'My location', 'map.fullscreen': 'Full screen',
+  'map.noResults': 'No places found.', 'map.locError': 'Could not get your location. Allow location access and try again.',
+  'cmp.btn': 'Compare', 'cmp.tip': 'Compare two dates: map of the change between them', 'cmp.title': 'Change in {idx}', 'cmp.with': 'Compared with',
+  'cmp.mean': 'Mean change', 'cmp.strongDec': 'Strong decrease', 'cmp.dec': 'Decrease', 'cmp.slightDec': 'Slight decrease', 'cmp.stable': 'Stable',
+  'cmp.slightInc': 'Slight increase', 'cmp.inc': 'Increase', 'cmp.strongInc': 'Strong increase',
+  'cmp.trueColor': 'Change maps need a vegetation index — choose NDVI or another index.', 'cmp.noOverlap': 'No part of the field is clear on both dates. Choose another date.',
+  'legend.geotiffTitle': 'Download this layer as a GeoTIFF (opens in QGIS / ArcGIS)',
+  'stage.title': 'Growth stage', 'stage.day': 'day {n} after sowing', 'stage.expected': 'Expected harvest ≈ {d}', 'stage.harvestShort': 'Expected harvest',
+  'stage.beforeSowing': 'Sowing in {n} days', 'stage.done': 'Season complete — ready for harvest', 'stage.noSowing': 'Enter the sowing date to see the growth stage.',
+  'stage.note': 'typical durations', 'stage.emergence': 'Emergence', 'stage.seedling': 'Seedling', 'stage.tillering': 'Tillering', 'stage.booting': 'Panicle initiation',
+  'stage.heading': 'Heading & flowering', 'stage.grainfill': 'Grain filling', 'stage.maturity': 'Maturity', 'stage.vegetative': 'Vegetative', 'stage.flowering': 'Flowering',
+  'stage.podfill': 'Pod filling', 'stage.establishment': 'Establishment', 'stage.canopy': 'Canopy growth', 'stage.bulking': 'Root bulking',
+  'stage.germination': 'Germination', 'stage.grandgrowth': 'Grand growth', 'stage.ripening': 'Ripening',
   'demo.name': 'Demo rice field (Battambang)',
   'help.title': 'Help — how to use Srae Monitor',
 };
@@ -197,6 +210,19 @@ const km = {
 
   'report.title': 'របាយការណ៍តាមដានស្រែ', 'report.print': 'បោះពុម្ព / រក្សាទុកជា PDF', 'report.history': 'ប្រវត្តិសន្ទស្សន៍រុក្ខជាតិ',
   'report.sources': 'ប្រភព៖ Copernicus Sentinel-2 L2A តាមរយៈ Earth Search (AWS Open Data) និងអាកាសធាតុ Open-Meteo។ បង្កើតដោយ Srae Monitor។',
+  'map.searchPh': 'ស្វែងរកទីកន្លែង ឬ រយៈទទឹង, រយៈបណ្ដោយ', 'map.search': 'ស្វែងរក', 'map.locate': 'ទីតាំងរបស់ខ្ញុំ', 'map.fullscreen': 'ពេញអេក្រង់',
+  'map.noResults': 'រកមិនឃើញទីកន្លែងទេ។', 'map.locError': 'មិនអាចរកទីតាំងរបស់អ្នកបានទេ។ សូមអនុញ្ញាតការចូលប្រើទីតាំង ហើយព្យាយាមម្ដងទៀត។',
+  'cmp.btn': 'ប្រៀបធៀប', 'cmp.tip': 'ប្រៀបធៀបពីរកាលបរិច្ឆេទ៖ ផែនទីបម្រែបម្រួលរវាងពួកវា', 'cmp.title': 'បម្រែបម្រួល {idx}', 'cmp.with': 'ប្រៀបធៀបជាមួយ',
+  'cmp.mean': 'បម្រែបម្រួលមធ្យម', 'cmp.strongDec': 'ថយចុះខ្លាំង', 'cmp.dec': 'ថយចុះ', 'cmp.slightDec': 'ថយចុះបន្តិច', 'cmp.stable': 'ថេរ',
+  'cmp.slightInc': 'កើនឡើងបន្តិច', 'cmp.inc': 'កើនឡើង', 'cmp.strongInc': 'កើនឡើងខ្លាំង',
+  'cmp.trueColor': 'ផែនទីបម្រែបម្រួលត្រូវការសន្ទស្សន៍រុក្ខជាតិ — សូមជ្រើស NDVI ឬសន្ទស្សន៍ផ្សេង។', 'cmp.noOverlap': 'គ្មានផ្នែកណាមួយនៃស្រែច្បាស់នៅទាំងពីរថ្ងៃទេ។ សូមជ្រើសថ្ងៃផ្សេង។',
+  'legend.geotiffTitle': 'ទាញយកស្រទាប់នេះជា GeoTIFF (បើកក្នុង QGIS / ArcGIS)',
+  'stage.title': 'ដំណាក់កាលលូតលាស់', 'stage.day': 'ថ្ងៃទី {n} ក្រោយសាបព្រោះ', 'stage.expected': 'ប្រមូលផលប្រហែល {d}', 'stage.harvestShort': 'ប្រមូលផល (ប៉ាន់ស្មាន)',
+  'stage.beforeSowing': 'សាបព្រោះក្នុងរយៈ {n} ថ្ងៃទៀត', 'stage.done': 'ចប់រដូវ — ត្រៀមប្រមូលផល', 'stage.noSowing': 'បញ្ចូលថ្ងៃសាបព្រោះ ដើម្បីមើលដំណាក់កាលលូតលាស់។',
+  'stage.note': 'រយៈពេលជាមធ្យម', 'stage.emergence': 'ដុះពន្លក', 'stage.seedling': 'កូនសំណាប', 'stage.tillering': 'បែកគុម្ព', 'stage.booting': 'ផ្ដើមផ្ទៃពោះ',
+  'stage.heading': 'ចេញកួរ និងចេញផ្កា', 'stage.grainfill': 'ពេញគ្រាប់', 'stage.maturity': 'ទុំ', 'stage.vegetative': 'លូតលាស់ដើមស្លឹក', 'stage.flowering': 'ចេញផ្កា',
+  'stage.podfill': 'ពេញសំបក', 'stage.establishment': 'ចាក់ឫស', 'stage.canopy': 'លូតលាស់ស្លឹក', 'stage.bulking': 'ធំមើម',
+  'stage.germination': 'ដុះពន្លក', 'stage.grandgrowth': 'លូតលាស់ខ្លាំង', 'stage.ripening': 'ទុំ',
   'demo.name': 'ស្រែស្រូវគំរូ (បាត់ដំបង)',
   'help.title': 'ជំនួយ — របៀបប្រើ Srae Monitor',
 };
@@ -249,6 +275,8 @@ const HELP = {
 <p>Calculates the field's mean index for every clear image in the season, so you can follow crop development and compare with last year. Processing happens in your browser; results are saved for next time.</p>
 <h3>5. Weather, zones and scouting</h3>
 <p><b>Weather</b> shows rainfall, temperature, soil moisture, a 14-day forecast and growing degree days since sowing. <b>Zones</b> divides the field into 2–7 productivity zones that you can export with fertiliser rates. <b>Scouting</b> lets you pin observations and photos on the map. <b>Field report</b> makes a printable PDF.</p>
+<h3>6. Compare dates, growth stage and export</h3>
+<p><b>Compare</b> (map toolbar) shows where the crop improved or declined between two images. The <b>Status</b> tab estimates the growth stage from the sowing date. <b>GeoTIFF</b> in the legend downloads the visible layer for QGIS. Use the search box to jump to a village or coordinates, ◎ for your GPS position, and ← → keys to step through image dates.</p>
 <h3>Data and privacy</h3>
 <p>Imagery: Copernicus Sentinel-2 L2A from the Earth Search STAC API (AWS Open Data). Weather: Open-Meteo. Place names: OpenStreetMap Nominatim. Your fields and notes are stored only in this browser — use <b>Backup</b> to move them to another device.</p>
 <p class="muted">Limits: Sentinel-2 pixels are 10–20 m, so very small plots (&lt; 0.2 ha) show few pixels. During the rainy season many images are cloudy.</p>`,
@@ -266,6 +294,8 @@ const HELP = {
 <p>គណនាតម្លៃមធ្យមនៃសន្ទស្សន៍សម្រាប់រូបភាពច្បាស់នីមួយៗក្នុងរដូវ ដើម្បីតាមដានការលូតលាស់ និងប្រៀបធៀបជាមួយឆ្នាំមុន។ ការដំណើរការធ្វើឡើងក្នុងកម្មវិធីរុករករបស់អ្នក ហើយលទ្ធផលត្រូវរក្សាទុក។</p>
 <h3>៥. អាកាសធាតុ តំបន់ និងការតាមដាន</h3>
 <p><b>អាកាសធាតុ</b> បង្ហាញបរិមាណទឹកភ្លៀង សីតុណ្ហភាព សំណើមដី ការព្យាករណ៍ ១៤ ថ្ងៃ និងដឺក្រេ-ថ្ងៃលូតលាស់តាំងពីសាបព្រោះ។ <b>តំបន់</b> បែងចែកស្រែជា ២–៧ តំបន់ផលិតភាព ដែលអាចនាំចេញជាមួយអត្រាជី។ <b>ការតាមដាន</b> អនុញ្ញាតឱ្យដាក់ការសង្កេត និងរូបថតលើផែនទី។ <b>របាយការណ៍ស្រែ</b> បង្កើតឯកសារ PDF សម្រាប់បោះពុម្ព។</p>
+<h3>៦. ប្រៀបធៀបកាលបរិច្ឆេទ ដំណាក់កាលលូតលាស់ និងការនាំចេញ</h3>
+<p><b>ប្រៀបធៀប</b> (របារឧបករណ៍ផែនទី) បង្ហាញកន្លែងដែលដំណាំប្រសើរឡើង ឬធ្លាក់ចុះរវាងរូបភាពពីរ។ ផ្ទាំង <b>ស្ថានភាព</b> ប៉ាន់ស្មានដំណាក់កាលលូតលាស់ពីថ្ងៃសាបព្រោះ។ ប៊ូតុង <b>GeoTIFF</b> ក្នុងតារាងពណ៌ ទាញយកស្រទាប់ដែលកំពុងបង្ហាញសម្រាប់ QGIS។ ប្រើប្រអប់ស្វែងរកដើម្បីទៅភូមិ ឬកូអរដោនេ ◎ សម្រាប់ទីតាំង GPS របស់អ្នក និងគ្រាប់ចុច ← → ដើម្បីប្ដូរកាលបរិច្ឆេទរូបភាព។</p>
 <h3>ទិន្នន័យ និងឯកជនភាព</h3>
 <p>រូបភាព៖ Copernicus Sentinel-2 L2A ពី Earth Search STAC API (AWS Open Data)។ អាកាសធាតុ៖ Open-Meteo។ ឈ្មោះទីកន្លែង៖ OpenStreetMap Nominatim។ ស្រែ និងកំណត់ត្រារបស់អ្នករក្សាទុកតែក្នុងកម្មវិធីរុករកនេះប៉ុណ្ណោះ — ប្រើ <b>បម្រុងទុក</b> ដើម្បីផ្ទេរទៅឧបករណ៍ផ្សេង។</p>
 <p class="muted">ដែនកំណត់៖ ភីកសែល Sentinel-2 មានទំហំ ១០–២០ ម៉ែត្រ ដូច្នេះដីតូចៗ (&lt; 0.2 ហិកតា) មានភីកសែលតិច។ នៅរដូវវស្សា រូបភាពជាច្រើនមានពពក។</p>`,

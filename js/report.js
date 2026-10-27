@@ -36,7 +36,8 @@ export function openReport(o) {
     <div class="k"><span>${esc(t('field.sowing'))}</span><b>${f.sowing ? esc(fmtDate(f.sowing)) : '—'}</b></div>
     <div class="k"><span>${esc(t('field.variety'))}</span><b>${esc(f.variety || '—')}</b></div>
   </div>
-  ${o.mapImg ? `<h2>${esc(o.mapIsZones ? t('zones.title') : o.indexName)} — ${esc(o.scene ? fmtDate(o.scene.date) : '')}</h2>
+  ${o.stage ? `<p><b>${esc(t('stage.title'))}:</b> ${esc(o.stage)}</p>` : ''}
+  ${o.mapImg ? `<h2>${esc(o.mapTitle || (o.mapIsZones ? t('zones.title') : o.indexName))} — ${esc(o.scene ? fmtDate(o.scene.date) : '')}</h2>
   <div class="two"><img class="map" src="${o.mapImg}" alt="">
    <div>${r && r.stats ? `<p><b>${esc(t('legend.mean'))}:</b> ${r.stats.mean.toFixed(3)} &nbsp; <b>${esc(t('legend.min'))}:</b> ${r.stats.min.toFixed(2)} &nbsp; <b>${esc(t('legend.max'))}:</b> ${r.stats.max.toFixed(2)}</p>` : ''}
    <p>${esc(t('legend.clear'))}: ${r ? Math.round(r.validFrac * 100) : 0}%</p>

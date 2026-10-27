@@ -1,1 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#2e7d4f"/><path d="M5 22c5-2 9-2 13 0s8 2 9 1M5 17c5-2 9-2 13 0s8 2 9 1" stroke="#cfe8b0" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="23" cy="9" r="3.2" fill="#ffd54a"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#17603f"/><stop offset="1" stop-color="#0b3526"/></linearGradient>
+    <clipPath id="leaf"><path d="M126 386C114 236 214 130 386 126c6 170-96 270-260 260Z"/></clipPath>
+    <clipPath id="front"><rect x="-260" y="0" width="520" height="120"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="114" fill="url(#bg)"/>
+  <g transform="translate(256 256) scale(1.08) translate(-256 -256)">
+  <g transform="translate(256 262) rotate(-22)">
+    <ellipse rx="214" ry="70" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="9"/>
+  </g>
+  <g clip-path="url(#leaf)">
+    <g transform="rotate(45 256 256)">
+      <rect x="0" y="0" width="512" height="512" fill="#0b3526"/>
+      <rect x="0" y="80"  width="512" height="62" fill="#2a9d5c"/>
+      <rect x="0" y="150" width="512" height="62" fill="#4cb85a"/>
+      <rect x="0" y="220" width="512" height="62" fill="#86cc4f"/>
+      <rect x="0" y="290" width="512" height="62" fill="#bcd94a"/>
+      <rect x="0" y="360" width="512" height="80" fill="#e6d34a"/>
+    </g>
+    <path d="M118 394C190 330 300 220 394 118" stroke="#0b3526" stroke-width="9" fill="none" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(256 262) rotate(-22)">
+    <g clip-path="url(#front)"><ellipse rx="214" ry="70" fill="none" stroke="#fff" stroke-opacity=".92" stroke-width="9"/></g>
+    <g transform="translate(150 50) rotate(22)">
+      <rect x="-50" y="-11" width="30" height="22" rx="3" fill="#cfe7ff"/>
+      <rect x="20" y="-11" width="30" height="22" rx="3" fill="#cfe7ff"/>
+      <rect x="-22" y="-3" width="44" height="6" fill="#cfe7ff"/>
+      <rect x="-17" y="-17" width="34" height="34" rx="8" fill="#ffd54a" stroke="#0b3526" stroke-width="6"/>
+    </g>
+  </g>
+  </g>
+</svg>
