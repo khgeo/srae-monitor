@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Srae Monitor — Satellite crop monitoring</title>
+  <meta name="description" content="Free satellite crop monitoring: Sentinel-2 vegetation indices, field history, weather, productivity zones and scouting notes. Runs entirely in your browser.">
+  <meta name="theme-color" content="#1f3a2b">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Khmer:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Srae Monitor">
+      <svg viewBox="0 0 32 32" class="logo" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2e7d4f"/><path d="M5 22c5-2 9-2 13 0s8 2 9 1M5 17c5-2 9-2 13 0s8 2 9 1" stroke="#cfe8b0" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="23" cy="9" r="3.2" fill="#ffd54a"/></svg>
+      <span class="brand-name">Srae Monitor</span>
+      <span class="brand-sub" data-i18n="app.tagline">Satellite crop monitoring</span>
+    </a>
+    <div class="top-actions">
+      <label class="lang"><span data-i18n="ui.language">Language</span>
+        <select id="langSelect" aria-label="Language">
+          <option value="en">English</option>
+          <option value="km">ខ្មែរ (Khmer)</option>
+        </select>
+      </label>
+      <button id="btnSettings" class="icon-btn" data-i18n-title="ui.settings" title="Settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" transform="translate(-1 0)"/></svg>
+      </button>
+      <button id="btnHelp" class="btn help-btn" data-i18n="ui.help">Help</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel" id="panel">
+      <!-- Field list -->
+      <section id="viewList" class="view">
+        <div class="panel-head">
+          <h1><span data-i18n="fields.title">My fields</span> <span class="count" id="fieldCount"></span></h1>
+        </div>
+        <div class="panel-actions">
+          <button id="btnDraw" class="btn primary"><span aria-hidden="true">＋</span> <span data-i18n="fields.draw">Draw field</span></button>
+          <button id="btnImport" class="btn" data-i18n="fields.import">Import</button>
+          <details class="menu">
+            <summary class="btn" data-i18n="fields.more">More</summary>
+            <div class="menu-list">
+              <button id="btnDemo" data-i18n="fields.demo">Add demo field</button>
+              <button id="btnExportAll" data-i18n="fields.exportAll">Export all fields</button>
+              <button id="btnBackup" data-i18n="fields.backup">Backup all data</button>
+            </div>
+          </details>
+        </div>
+        <input id="fieldSearch" class="search" type="search" data-i18n-ph="fields.search" placeholder="Search fields…">
+        <ul id="fieldList" class="field-list"></ul>
+        <div id="emptyState" class="empty">
+          <svg viewBox="0 0 120 80" width="120" aria-hidden="true"><path d="M10 60 40 20l35 10 35-5-10 45-60 5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="5 4"/><circle cx="40" cy="20" r="4" fill="currentColor"/><circle cx="75" cy="30" r="4" fill="currentColor"/><circle cx="110" cy="25" r="4" fill="currentColor"/></svg>
+          <h2 data-i18n="fields.emptyTitle">No fields yet</h2>
+          <p data-i18n="fields.emptyText"></p>
+          <p class="muted small" data-i18n="fields.importHint"></p>
+        </div>
+        <div class="panel-foot" id="listFoot"></div>
+      </section>
+
+      <!-- Selected field -->
+      <section id="viewField" class="view" hidden>
+        <div class="field-head">
+          <button id="btnBack" class="icon-btn" data-i18n-title="ui.back" title="Back">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 5 8 12l7 7" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="fh-text"><h1 id="fName"></h1><div class="sub" id="fSub"></div></div>
+          <button id="btnZoomField" class="icon-btn" data-i18n-title="ui.zoom" title="Zoom">⌖</button>
+          <button id="btnEditField" class="icon-btn" data-i18n-title="ui.edit" title="Edit">✎</button>
+        </div>
+        <nav class="tabs" id="tabs" role="tablist">
+          <button data-tab="overview" data-i18n="tabs.overview">Status</button>
+          <button data-tab="chart" data-i18n="tabs.chart">Index chart</button>
+          <button data-tab="weather" data-i18n="tabs.weather">Weather</button>
+          <button data-tab="zones" data-i18n="tabs.zones">Zones</button>
+          <button data-tab="notes" data-i18n="tabs.notes">Scouting</button>
+        </nav>
+        <div class="tab-body" id="tabBody"></div>
+      </section>
+    </aside>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+
+      <div class="map-toolbar">
+        <label><span data-i18n="map.index">Index</span><select id="indexSelect"></select></label>
+        <label class="op"><span data-i18n="map.opacity">Opacity</span><input id="opacity" type="range" min="0" max="1" step="0.05" value="0.9"></label>
+        <label><span data-i18n="map.basemap">Base map</span>
+          <select id="basemapSelect">
+            <option value="satellite" data-i18n="bm.satellite">Satellite</option>
+            <option value="streets" data-i18n="bm.streets">Streets</option>
+            <option value="topo" data-i18n="bm.topo">Topographic</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="legend" id="legend" hidden></div>
+      <div class="pixel-info" id="pixelInfo" hidden></div>
+      <div class="draw-hint" id="drawHint" hidden></div>
+      <div class="edit-bar" id="editBar" hidden>
+        <button class="btn" id="editCancel" data-i18n="edit.cancel">Cancel</button>
+        <button class="btn primary" id="editSave" data-i18n="edit.save">Save shape</button>
+      </div>
+      <div class="map-loading" id="mapLoading" hidden><span class="spinner"></span> <span data-i18n="map.loading">Processing…</span></div>
+
+      <div class="timeline" id="timeline" hidden>
+        <button class="tl-btn" id="tlPrev" data-i18n-title="tl.prev" title="Older">‹</button>
+        <div class="scenes" id="scenes"></div>
+        <button class="tl-btn" id="tlNext" data-i18n-title="tl.next" title="Newer">›</button>
+      </div>
+    </div>
+  </main>
+
+  <div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <header><h2 id="modalTitle"></h2><button class="icon-btn" data-close aria-label="Close">✕</button></header>
+      <div class="modal-body" id="modalBody"></div>
+      <footer id="modalFoot"></footer>
+    </div>
+  </div>
+  <div id="toasts" aria-live="polite"></div>
+  <input type="file" id="fileImport" accept=".geojson,.json,.kml,.zip" multiple hidden>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
