@@ -23,6 +23,7 @@ export function style() {
       topo: raster(['https://a.tile.opentopomap.org/{z}/{x}/{y}.png', 'https://b.tile.opentopomap.org/{z}/{x}/{y}.png', 'https://c.tile.opentopomap.org/{z}/{x}/{y}.png'], 17, '© OpenTopoMap (CC-BY-SA), © OpenStreetMap'),
       dem: { type: 'raster-dem', tiles: ['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 14, attribution: 'Terrain: AWS Terrain Tiles' },
       demHs: { type: 'raster-dem', tiles: ['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 14 },
+      soil: { type: 'geojson', data: EMPTY },
       fields: { type: 'geojson', data: EMPTY },
       draw: { type: 'geojson', data: EMPTY },
       edit: { type: 'geojson', data: EMPTY },
@@ -34,6 +35,8 @@ export function style() {
       { id: 'bm-topo', type: 'raster', source: 'topo', layout: { visibility: 'none' }, paint: { 'raster-fade-duration': 120 } },
       { id: 'hillshade', type: 'hillshade', source: 'demHs', layout: { visibility: 'none' }, paint: { 'hillshade-exaggeration': 0.35, 'hillshade-shadow-color': '#0b1a12' } },
       { id: 'bm-labels', type: 'raster', source: 'esriLabels', paint: { 'raster-opacity': 0.85, 'raster-fade-duration': 120 } },
+      { id: 'soil-fill', type: 'fill', source: 'soil', layout: { visibility: 'none' }, paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.55 } },
+      { id: 'soil-line', type: 'line', source: 'soil', layout: { visibility: 'none' }, paint: { 'line-color': '#ffffff', 'line-opacity': 0.55, 'line-width': 0.7 } },
       { id: 'fields-fill', type: 'fill', source: 'fields', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': ['case', ['get', 'sel'], 0, 0.14] } },
       { id: 'fields-line', type: 'line', source: 'fields', layout: { 'line-join': 'round' }, paint: { 'line-color': ['case', ['get', 'sel'], '#ffffff', ['get', 'color']], 'line-width': ['case', ['get', 'sel'], 3, 2] } },
       { id: 'fields-hover', type: 'line', source: 'fields', filter: ['==', ['get', 'id'], ''], paint: { 'line-color': '#ffffff', 'line-width': 4, 'line-opacity': 0.9 } },
@@ -182,6 +185,22 @@ export class MapView {
   setOverlayOpacity(o) { this.whenReady(() => { if (this.map.getLayer('overlay')) this.map.setPaintProperty('overlay', 'raster-opacity', o); }); }
   clearOverlay() { this.whenReady(() => { if (this.map.getLayer('overlay')) this.map.setLayoutProperty('overlay', 'visibility', 'none'); }); }
 
+  // ---------------------------------------------------------------- soil-type layer
+  setSoilLayer(fc, visible) {
+    this.whenReady(() => {
+      if (fc) this.map.getSource('soil').setData(fc);
+      for (const id of ['soil-fill', 'soil-line']) this.map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+    });
+    this.soilVisible = !!visible;
+  }
+
+  /** Soil-type name under a screen point, when the soil layer is visible. */
+  soilAt(x, y) {
+    if (!this._ready || !this.soilVisible) return null;
+    const hit = this.map.queryRenderedFeatures([x, y], { layers: ['soil-fill'] });
+    return hit.length ? hit[0].properties.name : null;
+  }
+
   // ---------------------------------------------------------------- markers
   setNotes(notes, { html, icon }) {
     this._noteMarkers.forEach(mk => mk.remove());
@@ -215,7 +234,7 @@ export class MapView {
       const hit = this.map.queryRenderedFeatures(e.point, { layers: ['fields-fill'] });
       if (hit.length) fieldId = hit[0].properties.id;
     }
-    this.opts.onClick && this.opts.onClick({ lat: e.lngLat.lat, lng: e.lngLat.lng, fieldId, point: e.point });
+    this.opts.onClick && this.opts.onClick({ lat: e.lngLat.lat, lng: e.lngLat.lng, fieldId, point: e.point, shift: !!(e.originalEvent && e.originalEvent.shiftKey) });
   }
 
   _onMove(e) {
@@ -301,6 +320,19 @@ export class MapView {
     this.whenReady(() => this.map.getSource('draw').setData(EMPTY));
     if (!silent && d && d.onCancel) d.onCancel();
   }
+
+  /** Show (or clear with null) a sketch polygon — used by the field tracer. */
+  setSketch(geom) {
+    if (this.mode === 'draw') return;
+    const fc = geom ? { type: 'FeatureCollection', features: [
+      { type: 'Feature', properties: {}, geometry: geom },
+      { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: geom.coordinates[0] } },
+    ] } : EMPTY;
+    this.whenReady(() => this.map.getSource('draw').setData(fc));
+  }
+
+  /** Crosshair cursor that hover effects do not override (tracing, note placing). */
+  lockCursor(c) { this.cursorLocked = !!c; this.setCursor(c || ''); }
 
   // ---------------------------------------------------------------- shape editing
   startEdit(geometry) {

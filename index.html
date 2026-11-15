@@ -52,6 +52,7 @@
         </div>
         <div class="panel-actions">
           <button id="btnDraw" class="btn primary"><span aria-hidden="true">＋</span> <span data-i18n="fields.draw">Draw field</span></button>
+          <button id="btnTrace" class="btn" data-i18n-title="trace.tip" title="Click inside a field on the satellite map to outline it automatically"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 20 14 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M15 3v3M15 12v3M10.5 7.5h-3M22.5 7.5h-3M18.2 4.3l-1.4 1.4M18.2 10.7l-1.4-1.4M11.8 4.3l1.4 1.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> <span data-i18n="trace.btn">Trace field</span></button>
           <button id="btnImport" class="btn" data-i18n="fields.import">Import</button>
           <details class="menu">
             <summary class="btn" data-i18n="fields.more">More</summary>
@@ -97,6 +98,7 @@
           <button data-tab="overview" data-i18n="tabs.overview">Status</button>
           <button data-tab="chart" data-i18n="tabs.chart">Index chart</button>
           <button data-tab="weather" data-i18n="tabs.weather">Weather</button>
+          <button data-tab="soil" data-i18n="tabs.soil">Soil</button>
           <button data-tab="zones" data-i18n="tabs.zones">Zones</button>
           <button data-tab="notes" data-i18n="tabs.notes">Scouting</button>
         </nav>
@@ -116,6 +118,7 @@
       <div class="map-btns">
         <button id="btnLocate" class="map-btn" data-i18n-title="map.locate" title="My location"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
         <button id="btn3D" class="map-btn txt" aria-pressed="false" data-i18n-title="map.3d" title="3D terrain">3D</button>
+        <button id="btnSoil" class="map-btn" aria-pressed="false" data-i18n-title="map.soil" title="Soil map"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 8c3-2 6-2 9 0s6 2 9 0" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M3 13c3-2 6-2 9 0s6 2 9 0" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/><path d="M3 18c3-2 6-2 9 0s6 2 9 0" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" opacity=".45"/></svg></button>
         <button id="btnMeasure" class="map-btn" data-i18n-title="map.measure" title="Measure"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 17 17 3l4 4L7 21Z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="m7 13 2 2m1-5 2 2m1-5 2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
         <button id="btnFull" class="map-btn" data-i18n-title="map.fullscreen" title="Full screen"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
@@ -134,11 +137,22 @@
       </div>
 
       <div class="legend" id="legend" hidden></div>
+      <div class="soil-legend" id="soilLegend" hidden></div>
       <div class="pixel-info" id="pixelInfo" hidden></div>
       <div class="draw-hint" id="drawHint" hidden></div>
       <div class="edit-bar" id="editBar" hidden>
         <button class="btn" id="editCancel" data-i18n="edit.cancel">Cancel</button>
         <button class="btn primary" id="editSave" data-i18n="edit.save">Save shape</button>
+      </div>
+      <div class="trace-box" id="traceBox" hidden>
+        <label class="trace-tol"><span data-i18n="trace.tol">Tolerance</span>
+          <input id="traceTol" type="range" min="1" max="10" step="1" value="5">
+        </label>
+        <span class="trace-area" id="traceArea"></span>
+        <button class="btn" id="traceAdd" aria-pressed="false" data-i18n-title="trace.addTip" title="Next click adds a missed part (same as Shift+click)">＋ <span data-i18n="trace.add">Add part</span></button>
+        <button class="btn" id="traceClear" data-i18n="trace.clear">Clear</button>
+        <button class="btn primary" id="traceSave" data-i18n="trace.save">Save field</button>
+        <button class="btn" id="traceDone" data-i18n="trace.done">Done</button>
       </div>
       <div class="map-loading" id="mapLoading" hidden><span class="spinner"></span> <span data-i18n="map.loading">Processing…</span></div>
 

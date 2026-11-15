@@ -4,7 +4,7 @@ const KEY = {
   fields: 'srae.fields.v1',
   notes: 'srae.notes.v1',
   settings: 'srae.settings.v1',
-  ts: 'srae.ts.v2', // v2: radiometric-offset fix (v1 values may be wrong)
+  ts: 'srae.ts.v3', // v3: fine grid for small fields + field-edge handling (v2 means differ slightly)
   lang: 'srae.lang',
 };
 
@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS = {
   tsMaxScenes: 60,       // cap on scenes processed for a time series
   tsMinClear: 50,        // % of field that must be cloud-free for a time-series point
   gddBase: 10,           // base temperature for growing degree days (°C)
+  edgeMode: 'auto',      // field-edge pixels: auto | pure (exclude mixed pixels) | all
   basemap: 'satellite',
   opacity: 0.9,
 };
@@ -27,7 +28,7 @@ function write(k, v) {
   catch (e) { console.warn('storage full?', e); return false; }
 }
 
-try { localStorage.removeItem('srae.ts.v1'); } catch { /* ignore */ }
+try { localStorage.removeItem('srae.ts.v1'); localStorage.removeItem('srae.ts.v2'); } catch { /* ignore */ }
 
 export const store = {
   getFields: () => read(KEY.fields, []),

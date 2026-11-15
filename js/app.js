@@ -4,7 +4,7 @@ import { store, uid } from './store.js';
 import * as geo from './geo.js';
 import { INDICES, INDEX_ORDER, valueColor, cssColor, gradientCss, rampColor } from './indices.js';
 import { searchScenes } from './stac.js';
-import { processScene, mapLimit } from './raster.js';
+import { processScene, mapLimit, fieldPixelInfo } from './raster.js';
 import { breaks, classify, majority, zoneStats, vectorise, zoneColors } from './zones.js';
 import { getWeather, accumulate, getElevation, getPlaceName } from './weather.js';
 import { $, $$, h, esc, toast, openModal, closeModal, confirmBox, download, slug, loadScript } from './ui.js';
@@ -13,6 +13,11 @@ import { openReport } from './report.js';
 import { writeGeoTiff } from './tiffwriter.js';
 import { growthStage, STAGE_COLORS } from './stages.js';
 import { MapView, pathLength } from './mapview.js';
+import * as soil from './soil.js';
+import { adminAt, fieldLocation, inCambodia } from './admin.js';
+import { nominatimQueue } from './weather.js';
+import { fetchRetry } from './net.js';
+import { createTracer } from './tracer.js';
 
 const DAY = 86400000;
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -47,7 +52,8 @@ const S = {
 
 const fieldById = (id) => S.fields.find(f => f.id === id);
 const selField = () => fieldById(S.sel);
-const saveFields = () => store.saveFields(S.fields);
+let tracer = null; // created after the map (see 'field tracing')
+const saveFields = () => { store.saveFields(S.fields); if (tracer && tracer.active) tracer.fieldsChanged(); };
 const saveNotes = () => { if (!store.saveNotes(S.notes)) toast(t('msg.storageFull'), 'error'); };
 
 // ---------------------------------------------------------------- map (MapLibre GL, see mapview.js)
@@ -57,6 +63,33 @@ const mv = new MapView('map', {
   onMoveStart: () => { $('#pixelInfo').hidden = true; },
   onError: (msg) => toast(`${t('map.loadError')} (${msg})`, 'error', 15000),
 });
+
+// ---------------------------------------------------------------- field tracing (auto boundary)
+tracer = createTracer({
+  mv, t, toast,
+  getFields: () => S.fields,
+  setBusy: (on, msg) => { $('#mapLoading span:last-child').textContent = on && msg ? msg : t('map.loading'); setMapLoading(on); },
+  onSave: (geom) => {
+    const f = addField(geom);
+    if (!f) return null;
+    renderFieldLayers(); renderFieldList();
+    return f;
+  },
+  panel: {
+    box: $('#traceBox'), tol: $('#traceTol'), area: $('#traceArea'),
+    save: $('#traceSave'), clear: $('#traceClear'), done: $('#traceDone'), add: $('#traceAdd'),
+    onStop: () => { hideHint(); $('#btnTrace').classList.remove('active'); },
+  },
+});
+
+function startTrace() {
+  if (tracer.active) { tracer.stop(); return; }
+  stopModes();
+  if (S.settings.basemap !== 'satellite') setBasemap('satellite');
+  tracer.start();
+  $('#btnTrace').classList.add('active');
+  showHint(t('trace.hint'));
+}
 
 function setBasemap(key) {
   if (!['satellite', 'streets', 'topo'].includes(key)) key = 'satellite';
@@ -80,6 +113,7 @@ function mapPadding() {
 function fitAllFields(maxZoom = 15) { if (S.fields.length) mv.fitBox(fieldsBox(), { maxZoom, padding: mapPadding() }); }
 
 function onMapClick(e) {
+  if (tracer && tracer.active) { tracer.click(e); return; }
   if (S.noteMode) { setNoteMode(false); noteDialog({ lat: e.lat, lng: e.lng }); return; }
   if (e.fieldId && e.fieldId !== S.sel) selectField(e.fieldId);
 }
@@ -196,12 +230,30 @@ function addField(geometry, props = {}) {
 
 async function autofillField(f) {
   const [lon, lat] = geo.centroid(f.geometry);
-  const [place, elev] = await Promise.all([getPlaceName(lat, lon, getLang()), getElevation(lat, lon)]);
+  // Inside Cambodia the commune/district/province come from the site's own file (no geocoder call).
+  const admin = await adminAt(lon, lat);
+  const [place, elev] = await Promise.all([
+    admin ? Promise.resolve(null) : getPlaceName(lat, lon, getLang()),
+    getElevation(lat, lon),
+  ]);
   const cur = fieldById(f.id); if (!cur) return;
-  if (place) cur.location = place;
+  if (admin) { cur.admin = admin; cur.location = fieldLocation(cur, 'en'); } else if (place) cur.location = place;
   if (elev != null) cur.elevation = elev;
   saveFields();
   if (S.sel === f.id && S.tab === 'overview') renderTab();
+}
+
+/** Give fields saved before the commune file existed their commune/district/province (local, no network). */
+async function backfillAdmin() {
+  const todo = S.fields.filter(f => !f.admin && f.geometry && inCambodia(...geo.centroid(f.geometry)));
+  if (!todo.length) return;
+  let changed = false;
+  for (const f of todo) {
+    const [lon, lat] = geo.centroid(f.geometry);
+    const a = await adminAt(lon, lat);
+    if (a) { f.admin = a; f.location = fieldLocation(f, 'en'); changed = true; }
+  }
+  if (changed) { saveFields(); if (S.sel && S.tab === 'overview') renderTab(); }
 }
 
 function editFieldDialog(f, isNew = false) {
@@ -303,6 +355,7 @@ function stopMeasure() {
 }
 
 function stopModes() {
+  if (tracer && tracer.active) tracer.stop();
   if (S.drawing) { mv.stopDraw(); S.drawing = false; }
   if (S.editing) finishEditShape(false);
   stopMeasure();
@@ -324,6 +377,29 @@ function showList() {
   document.body.classList.remove('has-field');
   restyleFields(); renderFieldList(); renderNotesLayer();
   fitAllFields();
+}
+
+// ---------------------------------------------------------------- small fields
+/** Sentinel-2 pixel counts for the selected field: 10 m pixels touched and fully inside. */
+function pixelInfo(f) {
+  if (!S.grid || S.sel !== f.id) return null;
+  try { return fieldPixelInfo(S.grid, f.geometry, 10); } catch { return null; }
+}
+
+function pixelInfoRow(f) {
+  const p = pixelInfo(f); if (!p) return '';
+  return `<dt>${t('px.label')}</dt><dd>${esc(t('px.value', { n: p.nPix, pure: p.nPure }))}</dd>`;
+}
+
+/** Advice card for plots that cover only a few Sentinel-2 pixels (common for Cambodian paddies). */
+function smallFieldCard(f) {
+  const p = pixelInfo(f); if (!p) return '';
+  if (p.nPure >= 12 && f.areaM2 >= 5000) return '';
+  const tips = [t('px.tip1'), t('px.tip2'), t('px.tip3')];
+  if (p.nPure < 3) tips.unshift(t('px.tipTiny'));
+  return `<div class="card small-field"><h3>${t('px.title')}</h3>
+    <p class="small">${esc(t('px.intro', { n: p.nPix, pure: p.nPure }))}</p>
+    <ul class="small">${tips.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
 }
 
 function selectField(id, { force = false } = {}) {
@@ -409,7 +485,7 @@ function sceneKey(sc, index) { return `${S.sel}|${sc.id}|${index}`; }
 async function getResult(sc, index) {
   const k = sceneKey(sc, index);
   if (S.resultCache.has(k)) return S.resultCache.get(k);
-  const p = processScene(S.grid, sc, index, { signal: S.abort && S.abort.signal });
+  const p = processScene(S.grid, sc, index, { signal: S.abort && S.abort.signal, edgeMode: S.settings.edgeMode });
   S.resultCache.set(k, p);
   p.then((r) => {
     if (index !== 'TRUE' && r.stats) {
@@ -487,7 +563,12 @@ function updateTimelineValues() {
 function markTimeline() {
   $$('#scenes .chip').forEach(ch => ch.classList.toggle('active', +ch.dataset.i === S.sceneIdx));
   const a = $('#scenes .chip.active');
-  if (a) a.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  if (a) {
+    // scroll only the timeline strip (scrollIntoView would also scroll the map container)
+    const box = $('#scenes');
+    const left = a.offsetLeft - (box.clientWidth - a.offsetWidth) / 2;
+    box.scrollTo({ left, behavior: 'smooth' });
+  }
 }
 
 // ---------------------------------------------------------------- overlay rendering
@@ -575,6 +656,7 @@ function renderLegend() {
     body = `<div class="ramp" style="background:${gradientCss(S.index)}"></div>
       <div class="ramp-l"><span>${fmtNum(d.min)}</span><span>${fmtNum((d.min + d.max) / 2)}</span><span>${fmtNum(d.max)}</span></div>
       <div class="lg-stats"><span>${t('legend.mean')} <b>${r.stats.mean.toFixed(2)}</b></span><span>${t('legend.min')} ${r.stats.min.toFixed(2)}</span><span>${t('legend.max')} ${r.stats.max.toFixed(2)}</span></div>
+      ${r.edge ? `<p class="lg-edge small muted">${esc(r.edge.used === 'pure' ? t('px.usedPure', { n: r.edge.nPureValid, res: r.edge.pixRes }) : t('px.usedAll', { n: r.edge.nPix, res: r.edge.pixRes }))}</p>` : ''}
       <table class="bins">${rows}</table>`;
   } else {
     body = `<p class="muted small">${t('legend.noValid')}</p>`;
@@ -592,14 +674,28 @@ function renderLegend() {
 function fmtNum(v) { return Math.abs(v) >= 10 ? v.toFixed(0) : (Math.round(v * 100) / 100).toString(); }
 
 // pixel readout (MapView already throttles hover events to one per frame)
+function placeTip(box, e) {
+  box.hidden = false;
+  const wrap = box.parentElement, bw = box.offsetWidth, bh = box.offsetHeight;
+  const x = e.x + 14 + bw > wrap.clientWidth ? e.x - 14 - bw : e.x + 14;
+  const y = e.y + 14 + bh > wrap.clientHeight ? e.y - 14 - bh : e.y + 14;
+  box.style.left = `${Math.max(0, x)}px`; box.style.top = `${Math.max(0, y)}px`;
+}
 function pixelReadout(e) {
   const box = $('#pixelInfo');
   const r = S.result, g = S.grid;
-  if (!e || !r || !g || S.drawing || S.editing || S.measure) { box.hidden = true; return; }
+  if (!e || S.drawing || S.editing || S.measure) { box.hidden = true; return; }
+  const showSoil = () => {
+    const name = mv.soilAt(e.x, e.y);
+    if (!name) { box.hidden = true; return; }
+    box.textContent = `${t('soil.type')}: ${soilTypeLabel(name)}`;
+    placeTip(box, e);
+  };
+  if (!r || !g) return showSoil();
   const col = Math.floor((e.lng - g.west) / g.dLon), row = Math.floor((g.north - e.lat) / g.dLat);
-  if (col < 0 || row < 0 || col >= g.W || row >= g.H) { box.hidden = true; return; }
+  if (col < 0 || row < 0 || col >= g.W || row >= g.H) return showSoil();
   const i = row * g.W + col, st = r.status[i];
-  if (!st) { box.hidden = true; return; }
+  if (!st) return showSoil();
   let txt;
   const dv = compareActive() && !S.showZones ? S.compare.diff.values[i] : NaN;
   if (Number.isFinite(dv)) txt = `Δ ${S.index} ${dv > 0 ? '+' : ''}${dv.toFixed(3)}`;
@@ -609,12 +705,11 @@ function pixelReadout(e) {
   else if (r.rgb) txt = `RGB ${r.rgb[i * 3]}, ${r.rgb[i * 3 + 1]}, ${r.rgb[i * 3 + 2]}`;
   else txt = `${r.indexKey} ${r.values[i].toFixed(3)}`;
   box.textContent = txt;
-  box.style.left = `${e.x + 14}px`; box.style.top = `${e.y + 14}px`;
-  box.hidden = false;
+  placeTip(box, e);
 }
 
 // ---------------------------------------------------------------- tabs
-const TABS = ['overview', 'chart', 'weather', 'zones', 'notes'];
+const TABS = ['overview', 'chart', 'weather', 'soil', 'zones', 'notes'];
 function setTab(tab) {
   S.tab = TABS.includes(tab) ? tab : 'overview';
   $$('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === S.tab));
@@ -626,7 +721,7 @@ function renderTab() {
   const body = $('#tabBody');
   for (const id of ['index', 'weather', 'accum', 'soil']) destroyChart(id);
   body.innerHTML = '';
-  ({ overview: renderOverview, chart: renderChartTab, weather: renderWeatherTab, zones: renderZonesTab, notes: renderNotesTab })[S.tab](body, f);
+  ({ overview: renderOverview, chart: renderChartTab, weather: renderWeatherTab, soil: renderSoilTab, zones: renderZonesTab, notes: renderNotesTab })[S.tab](body, f);
 }
 
 // ---- overview
@@ -658,11 +753,13 @@ function renderOverview(body, f) {
       <button class="btn sm" data-act="chart">${t('ov.openChart')}</button></div>` : ''}
     ${stageCard(f)}
     <div class="card" id="ovWeather"><h3>${t('ov.weather')}</h3><p class="muted small"><span class="spinner"></span> ${t('ui.loading')}</p></div>
+    ${smallFieldCard(f)}
     <div class="card"><h3>${t('ov.info')}</h3>
       <dl class="info">
-        <dt>${t('field.location')}</dt><dd>${esc(f.location || '—')}</dd>
+        <dt>${t('field.location')}</dt><dd>${esc(fieldLocation(f, getLang()) || '—')}</dd>
         <dt>${t('field.elevation')}</dt><dd>${f.elevation != null ? `${Math.round(f.elevation)} m` : '—'}</dd>
         <dt>${t('field.coords')}</dt><dd>${lat.toFixed(5)}, ${lon.toFixed(5)}</dd>
+        ${pixelInfoRow(f)}
         ${f.owner ? `<dt>${t('field.owner')}</dt><dd>${esc(f.owner)}</dd>` : ''}
         ${f.harvest ? `<dt>${t('field.harvest')}</dt><dd>${fmtDate(f.harvest)}</dd>` : ''}
         ${f.desc ? `<dt>${t('field.notes')}</dt><dd>${esc(f.desc)}</dd>` : ''}
@@ -915,7 +1012,7 @@ async function runTimeSeries() {
     await mapLimit(todo, 3, async (sc) => {
       if (run.stopped || gen !== S.gen) return;
       try {
-        const r = await processScene(S.grid, sc, idx, { signal: run.abort.signal });
+        const r = await processScene(S.grid, sc, idx, { signal: run.abort.signal, edgeMode: S.settings.edgeMode });
         store.putTs(f.id, idx, sc.id, { date: sc.date, mean: r.stats ? r.stats.mean : NaN, p10: r.stats?.p10, p90: r.stats?.p90, std: r.stats?.std, valid: r.validFrac, cloud: r.cloudFrac });
       } catch (e) {
         if (e.name !== 'AbortError') { console.warn('ts scene failed', sc.id, e); store.putTs(f.id, idx, sc.id, { date: sc.date, mean: NaN, valid: 0, cloud: 1, error: true }); }
@@ -1135,7 +1232,7 @@ function renderNotesTab(body, f) {
 
 // ---------------------------------------------------------------- import / export
 function fieldsGeoJSON(list) {
-  return { type: 'FeatureCollection', features: list.map(f => ({ type: 'Feature', geometry: f.geometry, properties: { id: f.id, name: f.name, crop: f.crop, variety: f.variety, sowing: f.sowing, harvest: f.harvest, owner: f.owner, area_ha: +(f.areaM2 / 10000).toFixed(3), location: f.location } })) };
+  return { type: 'FeatureCollection', features: list.map(f => ({ type: 'Feature', geometry: f.geometry, properties: { id: f.id, name: f.name, crop: f.crop, variety: f.variety, sowing: f.sowing, harvest: f.harvest, owner: f.owner, area_ha: +(f.areaM2 / 10000).toFixed(3), location: fieldLocation(f, 'en'), ...(f.admin ? { commune: f.admin.en, district: f.admin.den, province: f.admin.pen, commune_km: f.admin.km, district_km: f.admin.dkm, province_km: f.admin.pkm, admin_code: f.admin.code } : {}) } })) };
 }
 
 function propName(p, i) {
@@ -1204,6 +1301,7 @@ async function makeReport() {
     scene: sc, result: S.result, mapImg, mapIsZones: !!(S.showZones && S.zones), mapTitle: compareActive() ? `${t('cmp.title', { idx: S.index })} (${fmtDate(S.scenes[S.compare.idx].date)} → ${sc ? fmtDate(sc.date) : ''})` : null,
     stage: (() => { const gs = growthStage(f.crop, f.sowing, f.harvest, todayIso()); return gs ? stageSummary(gs) : null; })(), chartImg: chart ? chart.toBase64Image() : null, wx, gddBase: S.settings.gddBase,
     zones: S.zones, zoneColors: S.zones ? zoneColors(S.zones.n).map(c => cssColor(c)) : null,
+    soil: await soilReportData(f),
     recs, notes: S.notes.filter(n => n.fieldId === f.id), pixelHa: S.grid.pixelAreaM2 / 10000,
     colorFor: (v) => cssColor(valueColor(tsIndex(), v)),
   });
@@ -1238,6 +1336,12 @@ function settingsDialog() {
     </div>
     <div class="row2">
       <label>${t('set.gddBase')}<input type="number" name="gddBase" min="0" max="20" step="0.5" value="${s.gddBase}"></label>
+      <label>${t('set.edge')}<select name="edgeMode">
+        <option value="auto" ${(s.edgeMode || 'auto') === 'auto' ? 'selected' : ''}>${t('set.edgeAuto')}</option>
+        <option value="pure" ${s.edgeMode === 'pure' ? 'selected' : ''}>${t('set.edgePure')}</option>
+        <option value="all" ${s.edgeMode === 'all' ? 'selected' : ''}>${t('set.edgeAll')}</option></select></label>
+    </div>
+    <div class="row2">
       <label>${t('set.collection')}<select name="collection">
         <option value="sentinel-2-l2a" ${s.collection === 'sentinel-2-l2a' ? 'selected' : ''}>Sentinel-2 L2A</option>
         <option value="sentinel-2-c1-l2a" ${s.collection === 'sentinel-2-c1-l2a' ? 'selected' : ''}>Sentinel-2 L2A Collection 1</option></select></label>
@@ -1252,7 +1356,8 @@ function settingsDialog() {
     actions: [{ label: t('ui.cancel') }, { label: t('ui.save'), kind: 'primary', onClick: () => {
       const fd = new FormData(form);
       for (const k of ['maxCloud', 'lookbackDays', 'tsMaxScenes', 'tsMinClear', 'gddBase']) { const v = parseFloat(fd.get(k)); if (Number.isFinite(v)) s[k] = v; }
-      const coll = fd.get('collection'); const changed = coll !== s.collection; s.collection = coll;
+      const coll = fd.get('collection'); const em = fd.get('edgeMode') || 'auto';
+      const changed = coll !== s.collection || em !== (s.edgeMode || 'auto'); s.collection = coll; s.edgeMode = em;
       store.saveSettings(s);
       if (changed) { store.clearTs(); S.resultCache.clear(); }
       if (S.sel) selectField(S.sel, { force: true }); else renderFieldList();
@@ -1437,7 +1542,7 @@ async function placeSearch(q) {
   if (ll) { mv.flyTo(ll[0], ll[1], 16); showSearchPin(ll[0], ll[1]); list.hidden = true; return; }
   list.innerHTML = `<li class="muted"><span class="spinner"></span></li>`; list.hidden = false;
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}&accept-language=${getLang() === 'km' ? 'km,en' : 'en'}`);
+    const r = await nominatimQueue(() => fetchRetry(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}&accept-language=${getLang() === 'km' ? 'km,en' : 'en'}`, {}, { retries: 2, base: 2000 }));
     const res = r.ok ? await r.json() : [];
     if (!res.length) { list.innerHTML = `<li class="muted">${t('map.noResults')}</li>`; return; }
     list.innerHTML = '';
@@ -1502,7 +1607,7 @@ async function checkAllFields() {
         for (const sc of scenes) {
           let rec = cache[sc.id];
           if (!rec) {
-            const r = await processScene(grid, sc, 'NDVI');
+            const r = await processScene(grid, sc, 'NDVI', { edgeMode: S.settings.edgeMode });
             rec = { date: sc.date, mean: r.stats ? r.stats.mean : NaN, p10: r.stats?.p10, p90: r.stats?.p90, std: r.stats?.std, valid: r.validFrac, cloud: r.cloudFrac };
             store.putTs(f.id, 'NDVI', sc.id, rec);
           }
@@ -1532,8 +1637,173 @@ $('#btnMeasure').addEventListener('click', () => (S.measure ? stopMeasure() : st
 $('#btnCheckAll').addEventListener('click', checkAllFields);
 $('#fieldSort').addEventListener('change', (e) => { S.settings.sort = e.target.value; store.saveSettings(S.settings); renderFieldList(); });
 
+// ---------------------------------------------------------------- soil
+S.soil = new Map(); // fieldId -> Promise<soil summary>
+
+function loadSoil(f, force = false) {
+  const key = `${f.id}|${f.geometry.coordinates.flat(3).length}`;
+  if (!force && S.soil.has(key)) return S.soil.get(key);
+  const cacheKey = `srae.soil.${f.id}`;
+  const p = (async () => {
+    if (!force) {
+      try {
+        const c = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+        if (c && c.key === key && c.data && c.data.top) return c.data;
+      } catch { /* ignore */ }
+    }
+    const data = await soil.getSoil(f.geometry);
+    try { localStorage.setItem(cacheKey, JSON.stringify({ key, data })); } catch { /* ignore */ }
+    return data;
+  })();
+  p.catch(() => S.soil.delete(key));
+  S.soil.set(key, p);
+  return p;
+}
+
+const soilTypeLabel = (name) => {
+  const k = soil.soilTypeKey(name);
+  return k ? `${name} — ${t(`stype.${k}.short`)}` : name;
+};
+const fmt1 = (v, d = 1) => (v == null || !Number.isFinite(v) ? '—' : v.toFixed(d));
+
+function textureTriangle(top, sub) {
+  // USDA texture triangle: sand bottom-left, silt bottom-right, clay top.
+  const W = 200, H = 173, P = 14;
+  const pt = (v) => [P + ((v.silt + v.clay / 2) / 100) * W, P + H - (v.clay / 100) * H];
+  const grid = [20, 40, 60, 80].map(k => {
+    const a = pt({ clay: k, silt: 0 }), b = pt({ clay: k, silt: 100 - k });
+    return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`;
+  }).join('');
+  const dot = (v, cls) => { if (!v || v.clay == null || v.silt == null) return ''; const [x, y] = pt(v); return `<circle class="${cls}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6"/>`; };
+  return `<svg viewBox="0 0 ${W + 2 * P} ${H + 2 * P + 14}" class="tex-tri" role="img" aria-label="${esc(t('soil.triangle'))}">
+    <polygon points="${P},${P + H} ${P + W},${P + H} ${P + W / 2},${P}" class="tri"/>
+    <g class="grid">${grid}</g>
+    <text x="${P + W / 2}" y="${P - 3}" text-anchor="middle">${esc(t('soil.clay'))}</text>
+    <text x="${P}" y="${P + H + 13}" text-anchor="start">${esc(t('soil.sand'))}</text>
+    <text x="${P + W}" y="${P + H + 13}" text-anchor="end">${esc(t('soil.silt'))}</text>
+    ${dot(sub, 'sub')}${dot(top, 'top')}
+  </svg>`;
+}
+
+function ratingChip(level) {
+  if (!level) return '';
+  return `<span class="chip-r r-${level}">${esc(t(`soil.r.${level}`))}</span>`;
+}
+
+function soilRows(v) {
+  const r = soil.ratings(v);
+  const row = (label, val, unit, rate) => `<tr><td>${esc(label)}</td><td><b>${val}</b> <small>${unit}</small></td><td>${rate}</td></tr>`;
+  return `<table class="data soil-t">
+    ${row(t('soil.clay'), fmt1(v.clay, 0), '%', '')}
+    ${row(t('soil.silt'), fmt1(v.silt, 0), '%', '')}
+    ${row(t('soil.sand'), fmt1(v.sand, 0), '%', '')}
+    ${row('pH (H₂O)', fmt1(v.phh2o), '', r.ph ? `<span class="chip-r ph-${r.ph}">${esc(t(`soil.ph.${r.ph}`))}</span>` : '')}
+    ${row(t('soil.soc'), fmt1(v.soc), 'g/kg', ratingChip(r.soc))}
+    ${row(t('soil.n'), fmt1(v.nitrogen, 2), 'g/kg', ratingChip(r.nitrogen))}
+    ${row('CEC', fmt1(v.cec), 'cmol(+)/kg', ratingChip(r.cec))}
+  </table>`;
+}
+
+async function renderSoilTab(body, f) {
+  body.innerHTML = `<p class="muted"><span class="spinner"></span> ${t('ui.loading')}</p>`;
+  let d;
+  try { d = await loadSoil(f); } catch (e) {
+    console.warn(e);
+    if (S.sel !== f.id || S.tab !== 'soil') return;
+    const meta = await soil.loadMeta();
+    body.innerHTML = `<div class="card"><h3>${t('soil.title')}</h3><p class="error">${t('soil.error')}</p>
+      ${meta ? '' : `<p class="small muted">${t('soil.notBuilt')}</p>`}
+      <button class="btn" id="soilRetry">${t('ui.retry')}</button></div>`;
+    $('#soilRetry').onclick = () => { loadSoil(f, true); renderTab(); };
+    return;
+  }
+  if (S.sel !== f.id || S.tab !== 'soil') return;
+  const top = d.top, sub = d.sub;
+  if (!top) { body.innerHTML = `<div class="card"><p class="muted">${t('soil.noData')}</p></div>`; return; }
+  const tex = soil.textureClass(top.sand, top.silt, top.clay);
+  const texSub = sub ? soil.textureClass(sub.sand, sub.silt, sub.clay) : null;
+  const ck = soil.cropKey(f.crop);
+  const mine = soil.suitability(ck, top);
+  const tkey = soil.soilTypeKey(d.type);
+  const adv = soil.advice(top, ck);
+  const suitRows = soil.SUIT_CROPS.map(c => {
+    const s = soil.suitability(c, top);
+    return `<tr class="${c === ck ? 'mine' : ''}"><td>${esc(cropName(c === 'rice' ? 'rice_wet' : c).replace(/\s*\(.*\)/, ''))}</td><td><span class="suit s-${s.level}">${esc(t(`suit.${s.level}`))}</span></td><td class="small muted">${s.limits.map(l => esc(t(`suit.lim.${l}`))).join(', ')}</td></tr>`;
+  }).join('');
+  body.innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><span>${t('soil.texture')}</span><b>${tex ? esc(t(`tex.${tex}`)) : '—'}</b><small>${t('soil.topsoil')}</small></div>
+      <div class="kpi"><span>pH</span><b>${fmt1(top.phh2o)}</b><small>${top.phh2o != null ? esc(t(`soil.ph.${soil.phClass(top.phh2o)}`)) : ''}</small></div>
+      <div class="kpi"><span>${t('soil.soc')}</span><b>${fmt1(top.soc)} <small>g/kg</small></b><small>${top.soc != null ? esc(t(`soil.r.${soil.ratings(top).soc}`)) : ''}</small></div>
+      <div class="kpi"><span>${t('soil.suitFor', { crop: cropName(f.crop) })}</span><b>${mine ? `<span class="suit s-${mine.level}">${esc(t(`suit.${mine.level}`))}</span>` : '—'}</b><small>${mine && mine.limits.length ? mine.limits.map(l => esc(t(`suit.lim.${l}`))).join(', ') : ''}</small></div>
+    </div>
+    ${d.type ? `<div class="card"><h3>${t('soil.type')} <small class="muted">(Crocker 1962)</small></h3>
+      <p><b>${esc(d.type)}</b></p>${tkey ? `<p class="small">${esc(t(`stype.${tkey}.desc`))}</p>` : ''}</div>` : ''}
+    <div class="card"><h3>${t('soil.properties')}</h3>
+      <div class="soil-grid">
+        <div>${textureTriangle(top, sub)}
+          <div class="tri-legend"><span><i class="top"></i>${t('soil.topsoil')}: ${tex ? esc(t(`tex.${tex}`)) : '—'}</span>${sub ? `<span><i class="sub"></i>${t('soil.subsoil')}: ${texSub ? esc(t(`tex.${texSub}`)) : '—'}</span>` : ''}</div></div>
+        <div><div class="seg-tabs" id="soilDepth"><button class="active" data-d="top">${t('soil.topsoil')}</button>${sub ? `<button data-d="sub">${t('soil.subsoil')}</button>` : ''}</div>
+          <div id="soilRows">${soilRows(top)}</div></div>
+      </div></div>
+    <div class="card"><h3>${t('soil.advice')}</h3><ul class="advice">${adv.map(a => `<li>${esc(t(`adv.${a}`))}</li>`).join('')}</ul></div>
+    <div class="card"><h3>${t('soil.suitTitle')}</h3><table class="data suit-t">${suitRows}</table>
+      <p class="small muted">${t('soil.suitNote')}</p></div>
+    <div class="actions-grid"><button class="btn" id="soilMapBtn">${S.soilLayer ? t('soil.hideMap') : t('soil.showMap')}</button><button class="btn" id="soilCsv">${t('soil.csv')}</button></div>
+    <p class="source">${t(d.source === 'github' ? 'soil.srcGithub' : 'soil.srcApi')} ${t('soil.sources')}</p>`;
+  $$('#soilDepth button').forEach(b => b.addEventListener('click', () => {
+    $$('#soilDepth button').forEach(x => x.classList.toggle('active', x === b));
+    $('#soilRows').innerHTML = soilRows(b.dataset.d === 'sub' ? sub : top);
+  }));
+  $('#soilMapBtn').onclick = () => toggleSoilLayer();
+  $('#soilCsv').onclick = () => {
+    const rows = [['depth', 'clay_pct', 'silt_pct', 'sand_pct', 'texture', 'ph_h2o', 'soc_g_kg', 'nitrogen_g_kg', 'cec_cmol_kg']];
+    for (const [k, v] of [['0-30cm', top], ['30-60cm', sub]]) if (v) rows.push([k, fmt1(v.clay), fmt1(v.silt), fmt1(v.sand), soil.textureClass(v.sand, v.silt, v.clay) || '', fmt1(v.phh2o), fmt1(v.soc), fmt1(v.nitrogen, 2), fmt1(v.cec)]);
+    rows.push([]); rows.push(['soil_type_crocker_1962', d.type || '']); rows.push(['source', 'SoilGrids 2.0 (ISRIC, CC BY 4.0); Open Development Cambodia (CC BY 4.0)']);
+    download(`${slug(f.name)}_soil.csv`, rows.map(r => r.join(',')).join('\n'), 'text/csv');
+  };
+}
+
+async function soilReportData(f) {
+  try {
+    const d = await Promise.race([loadSoil(f), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000))]);
+    if (!d || !d.top) return null;
+    const v = d.top, tex = soil.textureClass(v.sand, v.silt, v.clay), sut = soil.suitability(soil.cropKey(f.crop), v);
+    return {
+      type: d.type, texture: tex ? t(`tex.${tex}`) : '—', clay: fmt1(v.clay, 0), silt: fmt1(v.silt, 0), sand: fmt1(v.sand, 0),
+      ph: fmt1(v.phh2o), soc: fmt1(v.soc), n: fmt1(v.nitrogen, 2), cec: fmt1(v.cec),
+      suit: sut ? t(`suit.${sut.level}`) : null, advice: soil.advice(v, soil.cropKey(f.crop)).map(a => t(`adv.${a}`)),
+    };
+  } catch { return null; }
+}
+
+async function toggleSoilLayer() {
+  S.soilLayer = !S.soilLayer;
+  $('#btnSoil').classList.toggle('active', S.soilLayer);
+  $('#btnSoil').setAttribute('aria-pressed', S.soilLayer);
+  if (S.soilLayer) {
+    const fc = await soil.loadSoilTypes();
+    if (!fc) { S.soilLayer = false; $('#btnSoil').classList.remove('active'); toast(t('soil.mapMissing'), 'warn', 9000); return; }
+    if (!fc._colored) { fc.features.forEach(ft => { ft.properties.color = soil.soilTypeColor(ft.properties.name); }); fc._colored = true; }
+    mv.setSoilLayer(fc, true);
+    renderSoilLegend(fc);
+  } else { mv.setSoilLayer(null, false); $('#soilLegend').hidden = true; }
+  if (S.tab === 'soil') renderTab();
+}
+
+function renderSoilLegend(fc) {
+  const names = [...new Set(fc.features.map(f => f.properties.name))].sort();
+  const el = $('#soilLegend');
+  el.innerHTML = `<div class="sl-head"><b>${t('soil.type')}</b> <small>Crocker 1962 · ODC</small><button class="icon-btn sm" id="slClose" aria-label="${esc(t('ui.close'))}">✕</button></div>
+    <ul>${names.map(n => `<li><i style="background:${soil.soilTypeColor(n)}"></i>${esc(n)}</li>`).join('')}</ul>`;
+  el.hidden = false;
+  $('#slClose').onclick = () => toggleSoilLayer();
+}
+$('#btnSoil').addEventListener('click', toggleSoilLayer);
+
 // ---------------------------------------------------------------- wiring
 $('#btnDraw').addEventListener('click', startDraw);
+$('#btnTrace').addEventListener('click', startTrace);
 $('#btnImport').addEventListener('click', () => $('#fileImport').click());
 $('#btnDemo').addEventListener('click', addDemoField);
 $('#btnExportAll').addEventListener('click', () => { if (!S.fields.length) return toast(t('msg.noFields'), 'warn'); download(`fields_${todayIso()}.geojson`, fieldsGeoJSON(S.fields), 'application/geo+json'); });
@@ -1573,6 +1843,7 @@ function refreshLanguage() {
   renderIndexSelect();
   renderFieldList();
   if (S.sel) { renderFieldHeader(); renderTab(); renderTimeline(); renderLegend(); }
+  if (S.soilLayer) soil.loadSoilTypes().then(fc => fc && renderSoilLegend(fc));
   renderNotesLayer();
 }
 
@@ -1593,4 +1864,5 @@ function refreshLanguage() {
   if (!globalThis.GeoTIFF || !globalThis.maplibregl) toast(t('msg.libFail'), 'error', 10000);
   const hash = new URLSearchParams(location.hash.slice(1));
   if (hash.get('field') && fieldById(hash.get('field'))) selectField(hash.get('field'));
+  backfillAdmin();
 })();
