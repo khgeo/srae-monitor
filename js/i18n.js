@@ -25,6 +25,18 @@ const en = {
 
   'tabs.overview': 'Status', 'tabs.chart': 'Index chart', 'tabs.weather': 'Weather', 'tabs.zones': 'Zones', 'tabs.notes': 'Scouting',
 
+  'trace.btn': 'Trace field', 'trace.tip': 'Click inside a field on the satellite map to outline it automatically',
+  'trace.hint': 'Click inside a field to outline it automatically. Shift+click (or Add part) adds a missed part. Enter saves and you can click the next field; Esc stops.',
+  'trace.add': 'Add part', 'trace.addTip': 'Next click adds a missed part (same as Shift+click)',
+  'trace.tol': 'Tolerance', 'trace.clear': 'Clear', 'trace.save': 'Save field', 'trace.done': 'Done', 'trace.area': '{ha} ha',
+  'trace.loading': 'Reading satellite imagery…',
+  'trace.zoomIn': 'Zoom in closer to the field (zoom 15 or more) to trace it.',
+  'trace.none': 'No clear field boundary found here. Try a higher tolerance, or draw the field.',
+  'trace.edge': 'The shape spread too far: the boundary is unclear here. Lower the tolerance or draw the field.',
+  'trace.apart': 'That part does not touch the current shape. Click inside the same field.',
+  'trace.existing': 'This spot is already inside one of your fields.',
+  'trace.saved': 'Field saved. Click the next field, or press Done.',
+  'trace.imgFail': 'Could not read the satellite imagery here. Check the internet connection or draw the field.',
   'draw.hint': 'Click on the map to add boundary points. Click the first point, double-click or press Enter to finish. Backspace undoes, Esc cancels.',
   'edit.hint': 'Drag the white corners to reshape. Drag a small blue dot to add a corner; right-click a corner to remove it. Then press Save shape.',
   'edit.save': 'Save shape', 'edit.cancel': 'Cancel',
@@ -85,6 +97,15 @@ const en = {
   'cat.disease': 'Disease', 'cat.pest': 'Pests', 'cat.weed': 'Weeds', 'cat.water': 'Flood / drought', 'cat.nutrient': 'Nutrient deficiency', 'cat.damage': 'Damage', 'cat.other': 'Other',
 
   'set.title': 'Settings', 'set.maxCloud': 'Max scene cloud cover (%)', 'set.lookback': 'Show images from last (days)',
+  'set.edge': 'Field-edge pixels', 'set.edgeAuto': 'Auto: leave out when possible (recommended)', 'set.edgePure': 'Always leave out', 'set.edgeAll': 'Include (area-weighted)',
+  'px.label': 'Sentinel-2 pixels', 'px.value': '{n} pixels (10 m), {pure} fully inside the field', 'px.title': 'Small field',
+  'px.intro': 'This field touches {n} Sentinel-2 pixels (10 m × 10 m); only {pure} lie fully inside it. Pixels on the edge mix the crop with bunds, paths and neighbouring plots.',
+  'px.tipTiny': 'Too few clean pixels: treat the index as an estimate for this spot, and compare with neighbouring fields rather than reading single values.',
+  'px.tip1': 'Use NDVI, EVI or MSAVI: they use the 10 m bands. NDRE, ReCI and NDMI use 20 m bands and suit larger fields.',
+  'px.tip2': 'Follow the trend in the Index chart: changes over time are more reliable than one image.',
+  'px.tip3': 'Edge pixels are left out of the field mean when there are enough clean pixels (Settings → Field-edge pixels).',
+  'px.usedPure': 'Mean from {n} Sentinel-2 pixels ({res} m) fully inside the field; edge pixels left out.',
+  'px.usedAll': 'Mean from all {n} Sentinel-2 pixels ({res} m) touching the field, weighted by the share inside it.',
   'set.tsMax': 'Max images per chart run', 'set.tsMinClear': 'Min clear part of field for chart (%)', 'set.gddBase': 'GDD base temperature (°C)',
   'set.collection': 'Sentinel-2 collection', 'set.clearCache': 'Clear cached index values', 'set.backup': 'Backup data', 'set.restore': 'Restore backup',
   'set.wipe': 'Delete all data', 'set.wipeConfirm': 'Delete ALL fields and notes stored in this browser?',
@@ -97,7 +118,7 @@ const en = {
   'msg.libFail': 'Map libraries failed to load. Check your internet connection and reload.', 'msg.popup': 'Allow pop-ups to open the report.',
 
   'report.title': 'Field monitoring report', 'report.print': 'Print / Save as PDF', 'report.history': 'Vegetation index history',
-  'report.sources': 'Sources: Copernicus Sentinel-2 L2A via Earth Search (AWS Open Data), Open-Meteo weather. Generated with Srae Monitor.',
+  'report.sources': 'Sources: Copernicus Sentinel-2 L2A via Earth Search (AWS Open Data), Open-Meteo weather, ISRIC SoilGrids 2.0 (CC BY 4.0), soil types by Crocker (1962) via Open Development Cambodia (CC BY 4.0). Generated with Srae Monitor.',
   'map.searchPh': 'Search place or lat, lon', 'map.search': 'Search', 'map.locate': 'My location', 'map.fullscreen': 'Full screen',
   'map.noResults': 'No places found.', 'map.locError': 'Could not get your location. Allow location access and try again.',
   'cmp.btn': 'Compare', 'cmp.tip': 'Compare two dates: map of the change between them', 'cmp.title': 'Change in {idx}', 'cmp.with': 'Compared with',
@@ -123,6 +144,43 @@ const en = {
   'alert.none': 'No weather warnings for the next 7 days.', 'alert.spray': 'Dry days for spraying or fertilising: {d}',
   'wx.forecast7': '7-day forecast',
   'map.loadError': 'The map could not load. Please send this message to the developer',
+  'tabs.soil': 'Soil', 'map.soil': 'Soil-type map (Crocker 1962)',
+  'soil.title': 'Soil', 'soil.type': 'Soil type', 'soil.texture': 'Texture', 'soil.topsoil': 'Topsoil 0–30 cm', 'soil.subsoil': 'Subsoil 30–60 cm',
+  'soil.clay': 'Clay', 'soil.silt': 'Silt', 'soil.sand': 'Sand', 'soil.soc': 'Organic carbon', 'soil.n': 'Total nitrogen',
+  'soil.properties': 'Soil properties', 'soil.triangle': 'Soil texture triangle', 'soil.advice': 'Management hints',
+  'soil.suitFor': 'Suitability for {crop}', 'soil.suitTitle': 'Which crops suit this soil?',
+  'soil.suitNote': 'Indicative rating from topsoil texture, pH and fertility only. Drainage, flooding, slope, depth and climate are not included.',
+  'soil.showMap': 'Show soil-type map', 'soil.hideMap': 'Hide soil-type map', 'soil.csv': 'Download soil data (CSV)',
+  'soil.srcGithub': 'Soil data: stored in this site (data/soil), built from SoilGrids 2.0 at 250 m.',
+  'soil.srcApi': 'Soil data: live from the SoilGrids 2.0 API (250 m).',
+  'soil.sources': 'Sources: ISRIC SoilGrids 2.0 (CC BY 4.0); soil types: Crocker (1962) via Open Development Cambodia (CC BY 4.0). Model estimates — confirm with a soil test.',
+  'soil.error': 'Soil data could not be loaded.', 'soil.noData': 'No soil data for this location.',
+  'soil.notBuilt': 'The soil data files have not been built yet. In the GitHub repository open Actions → “Update soil data” → Run workflow.',
+  'soil.mapMissing': 'The soil-type map is not available yet. Run the “Update soil data” workflow in the GitHub repository (Actions tab).',
+  'soil.r.veryLow': 'Very low', 'soil.r.low': 'Low', 'soil.r.medium': 'Medium', 'soil.r.high': 'High',
+  'soil.ph.extremelyAcid': 'Very strongly acid', 'soil.ph.stronglyAcid': 'Strongly acid', 'soil.ph.slightlyAcid': 'Slightly acid', 'soil.ph.neutral': 'Neutral', 'soil.ph.alkaline': 'Alkaline',
+  'tex.sand': 'Sand', 'tex.loamySand': 'Loamy sand', 'tex.sandyLoam': 'Sandy loam', 'tex.loam': 'Loam', 'tex.siltLoam': 'Silt loam', 'tex.silt': 'Silt',
+  'tex.sandyClayLoam': 'Sandy clay loam', 'tex.clayLoam': 'Clay loam', 'tex.siltyClayLoam': 'Silty clay loam', 'tex.sandyClay': 'Sandy clay', 'tex.siltyClay': 'Silty clay', 'tex.clay': 'Clay',
+  'suit.good': 'Suitable', 'suit.fair': 'Moderately suitable', 'suit.poor': 'Marginal',
+  'suit.lim.texture': 'texture', 'suit.lim.acid': 'too acid', 'suit.lim.alkaline': 'too alkaline', 'suit.lim.fertility': 'low fertility',
+  'adv.lime': 'Soil is very acid: consider liming (e.g. dolomite) based on a soil test, and use acid-tolerant varieties.',
+  'adv.alkaline': 'Soil is alkaline: some micronutrients (zinc, iron) may be less available.',
+  'adv.organic': 'Low organic matter: add manure or compost, keep crop residues (do not burn rice straw), consider green manure.',
+  'adv.nitrogen': 'Low nitrogen: plan adequate N fertiliser or legumes in rotation.',
+  'adv.sandy': 'Light (sandy) soil: holds little water and nutrients — split fertiliser into several small doses and mulch.',
+  'adv.lowCec': 'Low CEC: nutrients wash out easily; apply fertiliser little and often, add organic matter.',
+  'adv.drainage': 'Heavy clay: ensure good drainage for upland crops (ridges, raised beds).',
+  'adv.riceSandy': 'Sandy rice soil: water percolates quickly — keep bunds well maintained and level the field.',
+  'adv.soilTest': 'These are 250 m model estimates. A laboratory soil test of your field is the basis for fertiliser rates.',
+  'stype.regur.short': 'black cracking clay', 'stype.regur.desc': 'Dark, heavy clay that swells when wet and cracks when dry (Vertisol). Naturally fertile; good for maize, soybean, mung bean and dry-season crops; hard to work and can waterlog.',
+  'stype.latosol.short': 'deep red/brown soil', 'stype.latosol.desc': 'Deep, well-drained red or brown soils (Ferralsols/Nitisols), often on basalt. Good structure; suited to rubber, cashew, pepper, fruit trees and upland crops; acid and need nutrient management.',
+  'stype.plinthite.short': 'soil with ironstone layer', 'stype.plinthite.desc': 'Soils with a hard ironstone (laterite) layer at shallow depth that limits roots and drainage. Often poor; best for rice or tolerant crops.',
+  'stype.podzol.short': 'sandy, acid, low fertility', 'stype.podzol.desc': 'Sandy, acid and leached soils with low nutrient and water holding capacity. Need organic matter and split fertiliser; cassava and cashew tolerate them.',
+  'stype.planosol.short': 'hardpan, seasonally wet', 'stype.planosol.desc': 'Light topsoil over a dense, slowly permeable subsoil; waterlogged in the wet season and dry later. Mainly used for rice.',
+  'stype.hydromorphic.short': 'poorly drained, rice soil', 'stype.hydromorphic.desc': 'Poorly drained grey soils of lowlands, flooded part of the year. The main rice soils of Cambodia; fertility varies from low to moderate.',
+  'stype.coastal.short': 'coastal soil, salinity risk', 'stype.coastal.desc': 'Coastal and estuarine soils; may be saline or acid-sulphate. Check salinity and acidity before cropping.',
+  'stype.alluvial.short': 'river alluvium, fertile', 'stype.alluvial.desc': 'Young soils on river and lake deposits (Mekong, Tonle Sap). Generally fertile; suited to rice, vegetables, maize and riverbank (chamkar) crops; flood risk.',
+  'stype.lithosol.short': 'shallow, stony', 'stype.lithosol.desc': 'Shallow, stony soils on hills and mountains. Not suited to annual crops; erosion risk — keep under forest or perennial cover.',
   'demo.name': 'Demo rice field (Battambang)',
   'help.title': 'Help — how to use Srae Monitor',
 };
@@ -149,6 +207,18 @@ const km = {
 
   'tabs.overview': 'ស្ថានភាព', 'tabs.chart': 'ក្រាហ្វសន្ទស្សន៍', 'tabs.weather': 'អាកាសធាតុ', 'tabs.zones': 'តំបន់', 'tabs.notes': 'ការតាមដាន',
 
+  'trace.btn': 'គូសព្រំស្វ័យប្រវត្តិ', 'trace.tip': 'ចុចខាងក្នុងស្រែលើផែនទីផ្កាយរណប ដើម្បីគូសព្រំរបស់វាដោយស្វ័យប្រវត្តិ',
+  'trace.hint': 'ចុចខាងក្នុងស្រែ ដើម្បីគូសព្រំស្វ័យប្រវត្តិ។ Shift+ចុច (ឬ បន្ថែមផ្នែក) ដើម្បីបន្ថែមផ្នែកដែលខ្វះ។ Enter រក្សាទុក ហើយចុចស្រែបន្ទាប់បាន។ Esc ឈប់។',
+  'trace.add': 'បន្ថែមផ្នែក', 'trace.addTip': 'ការចុចបន្ទាប់បន្ថែមផ្នែកដែលខ្វះ (ដូច Shift+ចុច)',
+  'trace.tol': 'ភាពធូរ', 'trace.clear': 'សម្អាត', 'trace.save': 'រក្សាទុកស្រែ', 'trace.done': 'រួចរាល់', 'trace.area': '{ha} ហិកតា',
+  'trace.loading': 'កំពុងអានរូបភាពផ្កាយរណប…',
+  'trace.zoomIn': 'សូមពង្រីកផែនទីឱ្យជិតស្រែ (កម្រិត ១៥ ឡើងទៅ) ដើម្បីគូសព្រំ។',
+  'trace.none': 'រកមិនឃើញព្រំស្រែច្បាស់នៅទីនេះទេ។ សាកល្បងបង្កើនភាពធូរ ឬគូសស្រែដោយដៃ។',
+  'trace.edge': 'រាងលាតសន្ធឹងឆ្ងាយពេក៖ ព្រំនៅទីនេះមិនច្បាស់។ បន្ថយភាពធូរ ឬគូសស្រែដោយដៃ។',
+  'trace.apart': 'ផ្នែកនោះមិនជាប់នឹងរាងបច្ចុប្បន្នទេ។ សូមចុចខាងក្នុងស្រែតែមួយ។',
+  'trace.existing': 'ចំណុចនេះស្ថិតនៅក្នុងស្រែមួយរបស់អ្នករួចហើយ។',
+  'trace.saved': 'បានរក្សាទុកស្រែ។ ចុចស្រែបន្ទាប់ ឬចុច រួចរាល់។',
+  'trace.imgFail': 'មិនអាចអានរូបភាពផ្កាយរណបនៅទីនេះបានទេ។ ពិនិត្យអ៊ីនធឺណិត ឬគូសស្រែដោយដៃ។',
   'draw.hint': 'ចុចលើផែនទីដើម្បីដាក់ចំណុចព្រំ។ ចុចចំណុចដំបូង ចុចពីរដង ឬ Enter ដើម្បីបញ្ចប់។ Backspace ត្រឡប់ក្រោយ Esc បោះបង់។',
   'edit.hint': 'អូសជ្រុងពណ៌សដើម្បីកែរាង។ អូសចំណុចខៀវតូចដើម្បីបន្ថែមជ្រុង ចុចកណ្ដុរស្ដាំលើជ្រុងដើម្បីលុប។ រួចចុច «រក្សាទុករាង»។',
   'edit.save': 'រក្សាទុករាង', 'edit.cancel': 'បោះបង់',
@@ -209,6 +279,15 @@ const km = {
   'cat.disease': 'ជំងឺ', 'cat.pest': 'សត្វល្អិតចង្រៃ', 'cat.weed': 'ស្មៅ', 'cat.water': 'ទឹកជំនន់ / រាំងស្ងួត', 'cat.nutrient': 'ខ្វះជីជាតិ', 'cat.damage': 'ការខូចខាត', 'cat.other': 'ផ្សេងៗ',
 
   'set.title': 'ការកំណត់', 'set.maxCloud': 'ពពកអតិបរមាក្នុងរូបភាព (%)', 'set.lookback': 'បង្ហាញរូបភាពក្នុងរយៈ (ថ្ងៃ)',
+  'set.edge': 'ភីកសែលគែមស្រែ', 'set.edgeAuto': 'ស្វ័យប្រវត្តិ៖ ដកចេញពេលអាច (ណែនាំ)', 'set.edgePure': 'ដកចេញជានិច្ច', 'set.edgeAll': 'រាប់បញ្ចូល (ថ្លឹងតាមផ្ទៃ)',
+  'px.label': 'ភីកសែល Sentinel-2', 'px.value': '{n} ភីកសែល (១០ ម), {pure} នៅខាងក្នុងស្រែទាំងស្រុង', 'px.title': 'ស្រែតូច',
+  'px.intro': 'ស្រែនេះប៉ះនឹងភីកសែល Sentinel-2 ចំនួន {n} (១០ ម × ១០ ម) ប៉ុន្តែមានតែ {pure} ប៉ុណ្ណោះដែលនៅខាងក្នុងស្រែទាំងស្រុង។ ភីកសែលនៅគែមលាយដំណាំជាមួយភ្លឺស្រែ ផ្លូវ និងស្រែជិតខាង។',
+  'px.tipTiny': 'ភីកសែលស្អាតតិចពេក៖ ចាត់ទុកសន្ទស្សន៍ជាការប៉ាន់ស្មានប៉ុណ្ណោះ ហើយប្រៀបធៀបជាមួយស្រែជិតខាង ជាជាងអានតម្លៃតែមួយ។',
+  'px.tip1': 'ប្រើ NDVI, EVI ឬ MSAVI ព្រោះវាប្រើ band ១០ ម។ NDRE, ReCI និង NDMI ប្រើ band ២០ ម ដែលសមនឹងស្រែធំជាង។',
+  'px.tip2': 'តាមដាននិន្នាការក្នុងក្រាហ្វសន្ទស្សន៍៖ ការប្រែប្រួលតាមពេលវេលាអាចទុកចិត្តបានជាងរូបភាពតែមួយ។',
+  'px.tip3': 'ភីកសែលគែមត្រូវបានដកចេញពីតម្លៃមធ្យម នៅពេលមានភីកសែលស្អាតគ្រប់គ្រាន់ (ការកំណត់ → ភីកសែលគែមស្រែ)។',
+  'px.usedPure': 'មធ្យមពីភីកសែល Sentinel-2 ចំនួន {n} ({res} ម) ដែលនៅខាងក្នុងស្រែទាំងស្រុង ដោយដកភីកសែលគែមចេញ។',
+  'px.usedAll': 'មធ្យមពីភីកសែល Sentinel-2 ទាំង {n} ({res} ម) ដែលប៉ះស្រែ ថ្លឹងតាមចំណែកដែលនៅក្នុងស្រែ។',
   'set.tsMax': 'រូបភាពអតិបរមាក្នុងការគណនាម្ដង', 'set.tsMinClear': 'ផ្នែកច្បាស់អប្បបរមានៃស្រែ (%)', 'set.gddBase': 'សីតុណ្ហភាពមូលដ្ឋាន GDD (°C)',
   'set.collection': 'បណ្ដុំទិន្នន័យ Sentinel-2', 'set.clearCache': 'សម្អាតតម្លៃដែលបានរក្សាទុក', 'set.backup': 'បម្រុងទុក', 'set.restore': 'ស្ដារពីឯកសារបម្រុង',
   'set.wipe': 'លុបទិន្នន័យទាំងអស់', 'set.wipeConfirm': 'លុបស្រែ និងកំណត់ត្រាទាំងអស់ដែលរក្សាទុកក្នុងកម្មវិធីរុករកនេះ?',
@@ -221,7 +300,7 @@ const km = {
   'msg.libFail': 'បណ្ណាល័យផែនទីមិនអាចផ្ទុកបាន។ សូមពិនិត្យអ៊ីនធឺណិត ហើយផ្ទុកទំព័រឡើងវិញ។', 'msg.popup': 'សូមអនុញ្ញាត pop-up ដើម្បីបើករបាយការណ៍។',
 
   'report.title': 'របាយការណ៍តាមដានស្រែ', 'report.print': 'បោះពុម្ព / រក្សាទុកជា PDF', 'report.history': 'ប្រវត្តិសន្ទស្សន៍រុក្ខជាតិ',
-  'report.sources': 'ប្រភព៖ Copernicus Sentinel-2 L2A តាមរយៈ Earth Search (AWS Open Data) និងអាកាសធាតុ Open-Meteo។ បង្កើតដោយ Srae Monitor។',
+  'report.sources': 'ប្រភព៖ Copernicus Sentinel-2 L2A តាមរយៈ Earth Search (AWS Open Data) អាកាសធាតុ Open-Meteo ISRIC SoilGrids 2.0 (CC BY 4.0) និងប្រភេទដី Crocker (1962) តាមរយៈ Open Development Cambodia (CC BY 4.0)។ បង្កើតដោយ Srae Monitor។',
   'map.searchPh': 'ស្វែងរកទីកន្លែង ឬ រយៈទទឹង, រយៈបណ្ដោយ', 'map.search': 'ស្វែងរក', 'map.locate': 'ទីតាំងរបស់ខ្ញុំ', 'map.fullscreen': 'ពេញអេក្រង់',
   'map.noResults': 'រកមិនឃើញទីកន្លែងទេ។', 'map.locError': 'មិនអាចរកទីតាំងរបស់អ្នកបានទេ។ សូមអនុញ្ញាតការចូលប្រើទីតាំង ហើយព្យាយាមម្ដងទៀត។',
   'cmp.btn': 'ប្រៀបធៀប', 'cmp.tip': 'ប្រៀបធៀបពីរកាលបរិច្ឆេទ៖ ផែនទីបម្រែបម្រួលរវាងពួកវា', 'cmp.title': 'បម្រែបម្រួល {idx}', 'cmp.with': 'ប្រៀបធៀបជាមួយ',
@@ -247,6 +326,43 @@ const km = {
   'alert.none': 'គ្មានការព្រមានអាកាសធាតុសម្រាប់ ៧ ថ្ងៃខាងមុខទេ។', 'alert.spray': 'ថ្ងៃស្ងួតសម្រាប់បាញ់ថ្នាំ ឬដាក់ជី៖ {d}',
   'wx.forecast7': 'ព្យាករណ៍ ៧ ថ្ងៃ',
   'map.loadError': 'ផែនទីមិនអាចផ្ទុកបានទេ។ សូមផ្ញើសារនេះទៅអ្នកអភិវឌ្ឍន៍',
+  'tabs.soil': 'ដី', 'map.soil': 'ផែនទីប្រភេទដី (Crocker 1962)',
+  'soil.title': 'ដី', 'soil.type': 'ប្រភេទដី', 'soil.texture': 'វាយនភាពដី', 'soil.topsoil': 'ដីស្រទាប់លើ ០–៣០ សម', 'soil.subsoil': 'ដីស្រទាប់ក្រោម ៣០–៦០ សម',
+  'soil.clay': 'ដីឥដ្ឋ', 'soil.silt': 'ល្បាប់', 'soil.sand': 'ខ្សាច់', 'soil.soc': 'កាបូនសរីរាង្គ', 'soil.n': 'អាសូតសរុប',
+  'soil.properties': 'លក្ខណៈដី', 'soil.triangle': 'ត្រីកោណវាយនភាពដី', 'soil.advice': 'អនុសាសន៍គ្រប់គ្រងដី',
+  'soil.suitFor': 'ភាពសមស្របសម្រាប់ {crop}', 'soil.suitTitle': 'តើដំណាំណាខ្លះសមនឹងដីនេះ?',
+  'soil.suitNote': 'ការវាយតម្លៃប៉ាន់ស្មាន ផ្អែកតែលើវាយនភាព pH និងជីជាតិដីស្រទាប់លើ។ មិនរាប់បញ្ចូលការបង្ហូរទឹក ទឹកជំនន់ ជម្រាល ជម្រៅ និងអាកាសធាតុទេ។',
+  'soil.showMap': 'បង្ហាញផែនទីប្រភេទដី', 'soil.hideMap': 'លាក់ផែនទីប្រភេទដី', 'soil.csv': 'ទាញយកទិន្នន័យដី (CSV)',
+  'soil.srcGithub': 'ទិន្នន័យដី៖ រក្សាទុកក្នុងគេហទំព័រនេះ (data/soil) ផ្អែកលើ SoilGrids 2.0 គុណភាព ២៥០ ម៉ែត្រ។',
+  'soil.srcApi': 'ទិន្នន័យដី៖ ទាញផ្ទាល់ពី SoilGrids 2.0 API (២៥០ ម៉ែត្រ)។',
+  'soil.sources': 'ប្រភព៖ ISRIC SoilGrids 2.0 (CC BY 4.0); ប្រភេទដី៖ Crocker (1962) តាមរយៈ Open Development Cambodia (CC BY 4.0)។ ជាការប៉ាន់ស្មានពីគំរូ — សូមបញ្ជាក់ដោយការវិភាគដី។',
+  'soil.error': 'មិនអាចផ្ទុកទិន្នន័យដីបានទេ។', 'soil.noData': 'គ្មានទិន្នន័យដីសម្រាប់ទីតាំងនេះទេ។',
+  'soil.notBuilt': 'ឯកសារទិន្នន័យដីមិនទាន់បានបង្កើតនៅឡើយ។ ក្នុង GitHub repository សូមចូល Actions → «Update soil data» → Run workflow។',
+  'soil.mapMissing': 'ផែនទីប្រភេទដីមិនទាន់មាននៅឡើយ។ សូមដំណើរការ workflow «Update soil data» ក្នុង GitHub repository (ផ្ទាំង Actions)។',
+  'soil.r.veryLow': 'ទាបណាស់', 'soil.r.low': 'ទាប', 'soil.r.medium': 'មធ្យម', 'soil.r.high': 'ខ្ពស់',
+  'soil.ph.extremelyAcid': 'ជូរខ្លាំងណាស់', 'soil.ph.stronglyAcid': 'ជូរខ្លាំង', 'soil.ph.slightlyAcid': 'ជូរបន្តិច', 'soil.ph.neutral': 'អព្យាក្រឹត', 'soil.ph.alkaline': 'បាស (អាល់កាឡាំង)',
+  'tex.sand': 'ដីខ្សាច់ (Sand)', 'tex.loamySand': 'ដីខ្សាច់ល្បាយ (Loamy sand)', 'tex.sandyLoam': 'ដីល្បាយខ្សាច់ (Sandy loam)', 'tex.loam': 'ដីល្បាយ (Loam)', 'tex.siltLoam': 'ដីល្បាយល្បាប់ (Silt loam)', 'tex.silt': 'ដីល្បាប់ (Silt)',
+  'tex.sandyClayLoam': 'ដីល្បាយឥដ្ឋខ្សាច់ (Sandy clay loam)', 'tex.clayLoam': 'ដីល្បាយឥដ្ឋ (Clay loam)', 'tex.siltyClayLoam': 'ដីល្បាយឥដ្ឋល្បាប់ (Silty clay loam)', 'tex.sandyClay': 'ដីឥដ្ឋខ្សាច់ (Sandy clay)', 'tex.siltyClay': 'ដីឥដ្ឋល្បាប់ (Silty clay)', 'tex.clay': 'ដីឥដ្ឋ (Clay)',
+  'suit.good': 'សមស្រប', 'suit.fair': 'សមស្របមធ្យម', 'suit.poor': 'សមស្របតិចតួច',
+  'suit.lim.texture': 'វាយនភាព', 'suit.lim.acid': 'ជូរពេក', 'suit.lim.alkaline': 'បាសពេក', 'suit.lim.fertility': 'ជីជាតិទាប',
+  'adv.lime': 'ដីជូរខ្លាំង៖ គួរពិចារណាដាក់កំបោរ (ឧ. dolomite) ផ្អែកលើការវិភាគដី និងប្រើពូជធន់នឹងដីជូរ។',
+  'adv.alkaline': 'ដីបាស៖ សារធាតុចិញ្ចឹមតិចតួចមួយចំនួន (ស័ង្កសី ដែក) អាចស្រូបយកបានតិច។',
+  'adv.organic': 'សារធាតុសរីរាង្គទាប៖ ដាក់ជីលាមកសត្វ ឬជីកំប៉ុស ទុកកាកសំណល់ដំណាំ (កុំដុតចំបើង) ពិចារណាប្រើជីបៃតង។',
+  'adv.nitrogen': 'អាសូតទាប៖ គ្រោងដាក់ជីអាសូតគ្រប់គ្រាន់ ឬដាំសណ្ដែកឆ្លាស់។',
+  'adv.sandy': 'ដីស្រាល (ខ្សាច់)៖ រក្សាទឹក និងជីបានតិច — បំបែកការដាក់ជីជាច្រើនដងតូចៗ និងគ្របដី។',
+  'adv.lowCec': 'CEC ទាប៖ ជីងាយហូរបាត់ ដាក់ជីតិចៗ តែញឹកញាប់ និងបន្ថែមសារធាតុសរីរាង្គ។',
+  'adv.drainage': 'ដីឥដ្ឋធ្ងន់៖ ធានាការបង្ហូរទឹកល្អសម្រាប់ដំណាំចម្ការ (រងដី ថ្នាលខ្ពស់)។',
+  'adv.riceSandy': 'ដីស្រែខ្សាច់៖ ទឹកជ្រាបលឿន — ថែភ្លឺឱ្យល្អ និងរាបស្មើស្រែ។',
+  'adv.soilTest': 'នេះជាការប៉ាន់ស្មានពីគំរូ ២៥០ ម៉ែត្រ។ ការវិភាគដីស្រែរបស់អ្នកនៅមន្ទីរពិសោធន៍ គឺជាមូលដ្ឋានសម្រាប់កំណត់បរិមាណជី។',
+  'stype.regur.short': 'ដីឥដ្ឋខ្មៅប្រេះ', 'stype.regur.desc': 'ដីឥដ្ឋធ្ងន់ពណ៌ខ្មៅ ហើមពេលសើម និងប្រេះពេលស្ងួត (Vertisol)។ មានជីជាតិធម្មជាតិ ល្អសម្រាប់ពោត សណ្ដែកសៀង សណ្ដែកបាយ និងដំណាំរដូវប្រាំង ប៉ុន្តែពិបាកភ្ជួររាស់ និងអាចដក់ទឹក។',
+  'stype.latosol.short': 'ដីក្រហម/ត្នោតជ្រៅ', 'stype.latosol.desc': 'ដីក្រហម ឬត្នោតជ្រៅ បង្ហូរទឹកល្អ (Ferralsol/Nitisol) ច្រើនលើថ្មបាសាល់។ រចនាសម្ព័ន្ធល្អ សមសម្រាប់កៅស៊ូ ស្វាយចន្ទី ម្រេច ដើមឈើហូបផ្លែ និងដំណាំចម្ការ ប៉ុន្តែជូរ និងត្រូវការគ្រប់គ្រងជី។',
+  'stype.plinthite.short': 'ដីមានស្រទាប់ថ្មបាយក្រៀម', 'stype.plinthite.desc': 'ដីមានស្រទាប់ថ្មបាយក្រៀម (laterite) រឹងនៅជម្រៅរាក់ ដែលរារាំងឫស និងការបង្ហូរទឹក។ ជាទូទៅខ្សោយ សមសម្រាប់ស្រូវ ឬដំណាំធន់។',
+  'stype.podzol.short': 'ខ្សាច់ ជូរ ជីជាតិទាប', 'stype.podzol.desc': 'ដីខ្សាច់ ជូរ និងរលាយជីច្រើន ផ្ទុកទឹក និងជីបានតិច។ ត្រូវការសារធាតុសរីរាង្គ និងបំបែកការដាក់ជី ដំឡូងមី និងស្វាយចន្ទីអាចធន់បាន។',
+  'stype.planosol.short': 'មានស្រទាប់រឹង ដក់ទឹកតាមរដូវ', 'stype.planosol.desc': 'ដីស្រទាប់លើស្រាល លើស្រទាប់ក្រោមក្រាស់ ទឹកជ្រាបយឺត ដក់ទឹកនៅរដូវវស្សា និងស្ងួតនៅពេលក្រោយ។ ភាគច្រើនប្រើសម្រាប់ធ្វើស្រែ។',
+  'stype.hydromorphic.short': 'បង្ហូរទឹកខ្សោយ ដីស្រែ', 'stype.hydromorphic.desc': 'ដីពណ៌ប្រផេះនៅតំបន់ទំនាប បង្ហូរទឹកខ្សោយ លិចទឹកមួយផ្នែកនៃឆ្នាំ។ ជាដីស្រែសំខាន់របស់កម្ពុជា ជីជាតិពីទាបដល់មធ្យម។',
+  'stype.coastal.short': 'ដីឆ្នេរ ហានិភ័យប្រៃ', 'stype.coastal.desc': 'ដីតំបន់ឆ្នេរ និងមាត់ទន្លេ អាចប្រៃ ឬជូរស៊ុលហ្វាត។ សូមពិនិត្យភាពប្រៃ និងភាពជូរមុនដាំដុះ។',
+  'stype.alluvial.short': 'ដីល្បាប់ទន្លេ មានជីជាតិ', 'stype.alluvial.desc': 'ដីក្មេងលើដីល្បាប់ទន្លេ និងបឹង (មេគង្គ ទន្លេសាប)។ ជាទូទៅមានជីជាតិ សមសម្រាប់ស្រូវ បន្លែ ពោត និងដំណាំចម្ការមាត់ទន្លេ មានហានិភ័យទឹកជំនន់។',
+  'stype.lithosol.short': 'ដីរាក់ មានថ្ម', 'stype.lithosol.desc': 'ដីរាក់ មានថ្មច្រើន នៅលើភ្នំ និងទួល។ មិនសមសម្រាប់ដំណាំប្រចាំឆ្នាំ មានហានិភ័យសំណឹក — គួររក្សាព្រៃ ឬដំណាំអចិន្ត្រៃយ៍។',
   'demo.name': 'ស្រែស្រូវគំរូ (បាត់ដំបង)',
   'help.title': 'ជំនួយ — របៀបប្រើ Srae Monitor',
 };
@@ -288,6 +404,7 @@ const HELP = {
   en: `
 <h3>1. Add your fields</h3>
 <p>Press <b>Draw field</b> and click the corners of the field on the satellite map, or <b>Import</b> boundaries from GeoJSON, KML or a zipped Shapefile (for example exported from QGIS). Location and elevation are filled in automatically. Use the demo field to try the app straight away.</p>
+<p><b>Trace field</b> finds a boundary for you: zoom in on the satellite map and click inside a paddy. The outline follows the bunds, roads and tree lines seen in the very-high-resolution imagery. If it misses part of the field, <b>Shift+click</b> inside the missing part; if it spills into a neighbour, lower the <b>Tolerance</b>; if a bund is hard to see, raise it. Press <b>Enter</b> (or <b>Save field</b>) and click the next paddy — saved fields block the next trace, so neighbouring plots never overlap. Check each outline: the base-map imagery may be older than this season, and <b>Edit shape</b> fixes any corner.</p>
 <h3>2. Look at the latest satellite image</h3>
 <p>Select a field. The app searches all Sentinel-2 images (10 m, every ~5 days) and shows the newest image where most of the field is cloud-free. The <b>timeline</b> at the bottom lists every date with its cloud cover; click a date to change the image. Clouds and shadows are masked (hatched grey). Move the mouse over the field to read pixel values.</p>
 <h3>3. Choose an index</h3>
@@ -303,12 +420,17 @@ const HELP = {
 <p><b>Compare</b> (map toolbar) shows where the crop improved or declined between two images. The <b>Status</b> tab estimates the growth stage from the sowing date. <b>GeoTIFF</b> in the legend downloads the visible layer for QGIS. Use the search box to jump to a village or coordinates, ◎ for your GPS position, and ← → keys to step through image dates.</p>
 <h3>7. More map tools</h3>
 <p><b>3D</b> drapes the index map on terrain (right-click-drag or two fingers to tilt). The ruler measures distance, area and perimeter. In the field list, <b>Check all</b> fetches the latest clear NDVI for every field, and fields whose NDVI dropped are flagged ⚠. The Weather tab warns about heavy rain, heat and dry spells.</p>
+<h3>8. Soil</h3>
+<p>The <b>Soil</b> tab shows the topsoil and subsoil texture, pH, organic carbon, nitrogen and CEC of the field (SoilGrids 2.0, 250 m), the soil type from the Crocker (1962) soil map, management hints and which crops suit the soil. The layered button on the map shows the soil-type map. These are model estimates — confirm with a soil test.</p>
+<h3>9. Small fields</h3>
+<p>Sentinel-2 pixels are 10 m × 10 m, so a 0.2 ha paddy covers only about 20 of them, and those on the edge also see bunds, paths and neighbouring plots. For small fields the app uses a fine grid that follows the exact field shape and weights each satellite pixel by the share inside the field, and it leaves edge pixels out of the field mean whenever enough pixels lie fully inside (<b>Settings → Field-edge pixels</b>). The Status tab shows how many pixels the field has. Prefer NDVI, EVI or MSAVI (10 m bands) and follow the trend over time rather than a single image.</p>
 <h3>Data and privacy</h3>
-<p>Imagery: Copernicus Sentinel-2 L2A from the Earth Search STAC API (AWS Open Data). Weather: Open-Meteo. Place names: OpenStreetMap Nominatim. Your fields and notes are stored only in this browser — use <b>Backup</b> to move them to another device.</p>
+<p>Imagery: Copernicus Sentinel-2 L2A from the Earth Search STAC API (AWS Open Data). Weather: Open-Meteo. Soil: ISRIC SoilGrids 2.0 and Open Development Cambodia (CC BY 4.0). Commune / district / province: OCHA COD-AB boundaries (HDX) with NCDD Gazetteer names (Open Development Cambodia). Place search: OpenStreetMap Nominatim. Your fields and notes are stored only in this browser — use <b>Backup</b> to move them to another device.</p>
 <p class="muted">Limits: Sentinel-2 pixels are 10–20 m, so very small plots (&lt; 0.2 ha) show few pixels. During the rainy season many images are cloudy.</p>`,
   km: `
 <h3>១. បន្ថែមស្រែរបស់អ្នក</h3>
 <p>ចុច <b>គូរព្រំស្រែ</b> ហើយចុចលើជ្រុងស្រែនៅលើផែនទីផ្កាយរណប ឬ <b>នាំចូល</b> ព្រំពីឯកសារ GeoJSON, KML ឬ Shapefile (zip) (ឧ. នាំចេញពី QGIS)។ ទីតាំង និងកម្ពស់ត្រូវបំពេញដោយស្វ័យប្រវត្តិ។ ប្រើស្រែគំរូដើម្បីសាកល្បងភ្លាមៗ។</p>
+<p><b>គូសព្រំស្វ័យប្រវត្តិ</b> រកព្រំស្រែឱ្យអ្នក៖ ពង្រីកផែនទីផ្កាយរណប ហើយចុចខាងក្នុងស្រែ។ ព្រំនឹងតាមភ្លឺស្រែ ផ្លូវ និងជួរដើមឈើដែលឃើញក្នុងរូបភាពច្បាស់ខ្ពស់។ បើខ្វះផ្នែកណាមួយ សូម <b>Shift+ចុច</b> ក្នុងផ្នែកនោះ។ បើលាតចូលស្រែជិតខាង សូមបន្ថយ <b>ភាពធូរ</b>។ បើភ្លឺស្រែមើលឃើញពិបាក សូមបង្កើនវា។ ចុច <b>Enter</b> (ឬ <b>រក្សាទុកស្រែ</b>) ហើយចុចស្រែបន្ទាប់ — ស្រែដែលបានរក្សាទុករារាំងការគូសបន្ទាប់ ដូច្នេះស្រែជិតខាងមិនជាន់គ្នាទេ។ សូមពិនិត្យព្រំនីមួយៗ៖ រូបភាពផែនទីមូលដ្ឋានអាចចាស់ជាងរដូវនេះ ហើយ <b>កែរាង</b> អាចកែជ្រុងណាមួយបាន។</p>
 <h3>២. មើលរូបភាពផ្កាយរណបចុងក្រោយ</h3>
 <p>ជ្រើសរើសស្រែ។ កម្មវិធីស្វែងរករូបភាព Sentinel-2 ទាំងអស់ (១០ ម៉ែត្រ រៀងរាល់ប្រហែល ៥ ថ្ងៃ) ហើយបង្ហាញរូបភាពថ្មីបំផុតដែលស្រែភាគច្រើនគ្មានពពក។ <b>បន្ទាត់ពេលវេលា</b> នៅខាងក្រោមបង្ហាញកាលបរិច្ឆេទនីមួយៗ និងភាគរយពពក។ ចុចលើកាលបរិច្ឆេទដើម្បីប្ដូររូបភាព។ ពពក និងស្រមោលត្រូវបិទបាំង (ឆ្នូតប្រផេះ)។ ដាក់កណ្ដុរលើស្រែដើម្បីអានតម្លៃភីកសែល។</p>
 <h3>៣. ជ្រើសរើសសន្ទស្សន៍</h3>
@@ -324,8 +446,12 @@ const HELP = {
 <p><b>ប្រៀបធៀប</b> (របារឧបករណ៍ផែនទី) បង្ហាញកន្លែងដែលដំណាំប្រសើរឡើង ឬធ្លាក់ចុះរវាងរូបភាពពីរ។ ផ្ទាំង <b>ស្ថានភាព</b> ប៉ាន់ស្មានដំណាក់កាលលូតលាស់ពីថ្ងៃសាបព្រោះ។ ប៊ូតុង <b>GeoTIFF</b> ក្នុងតារាងពណ៌ ទាញយកស្រទាប់ដែលកំពុងបង្ហាញសម្រាប់ QGIS។ ប្រើប្រអប់ស្វែងរកដើម្បីទៅភូមិ ឬកូអរដោនេ ◎ សម្រាប់ទីតាំង GPS របស់អ្នក និងគ្រាប់ចុច ← → ដើម្បីប្ដូរកាលបរិច្ឆេទរូបភាព។</p>
 <h3>៧. ឧបករណ៍ផែនទីបន្ថែម</h3>
 <p><b>3D</b> បង្ហាញផែនទីសន្ទស្សន៍លើសណ្ឋានដី (ចុចកណ្ដុរស្ដាំហើយអូស ឬពីរម្រាមដៃ ដើម្បីផ្អៀង)។ បន្ទាត់វាស់ចម្ងាយ ផ្ទៃដី និងបរិមាត្រ។ ក្នុងបញ្ជីស្រែ <b>ពិនិត្យទាំងអស់</b> ទាញយក NDVI ច្បាស់ចុងក្រោយសម្រាប់ស្រែនីមួយៗ ហើយស្រែដែល NDVI ធ្លាក់ចុះត្រូវសម្គាល់ ⚠។ ផ្ទាំងអាកាសធាតុព្រមានអំពីភ្លៀងខ្លាំង កំដៅ និងរាំងស្ងួត។</p>
+<h3>៨. ដី</h3>
+<p>ផ្ទាំង <b>ដី</b> បង្ហាញវាយនភាព pH កាបូនសរីរាង្គ អាសូត និង CEC នៃដីស្រទាប់លើ និងស្រទាប់ក្រោមរបស់ស្រែ (SoilGrids 2.0, ២៥០ ម៉ែត្រ) ប្រភេទដីពីផែនទីដី Crocker (1962) អនុសាសន៍គ្រប់គ្រង និងដំណាំដែលសមនឹងដី។ ប៊ូតុងស្រទាប់នៅលើផែនទីបង្ហាញផែនទីប្រភេទដី។ ទាំងនេះជាការប៉ាន់ស្មានពីគំរូ — សូមបញ្ជាក់ដោយការវិភាគដី។</p>
+<h3>៩. ស្រែតូច</h3>
+<p>ភីកសែល Sentinel-2 មានទំហំ ១០ ម × ១០ ម ដូច្នេះស្រែ ០,២ ហិកតា គ្របដណ្ដប់ប្រហែល ២០ ភីកសែលប៉ុណ្ណោះ ហើយភីកសែលនៅគែមក៏ឃើញភ្លឺស្រែ ផ្លូវ និងស្រែជិតខាងដែរ។ សម្រាប់ស្រែតូច កម្មវិធីប្រើក្រឡាល្អិតដែលតាមរាងស្រែពិតប្រាកដ ហើយថ្លឹងភីកសែលនីមួយៗតាមចំណែកដែលនៅក្នុងស្រែ ព្រមទាំងដកភីកសែលគែមចេញពីតម្លៃមធ្យម នៅពេលមានភីកសែលនៅខាងក្នុងទាំងស្រុងគ្រប់គ្រាន់ (<b>ការកំណត់ → ភីកសែលគែមស្រែ</b>)។ ផ្ទាំងស្ថានភាពបង្ហាញចំនួនភីកសែលរបស់ស្រែ។ គួរប្រើ NDVI, EVI ឬ MSAVI (band ១០ ម) ហើយតាមដាននិន្នាការតាមពេលវេលា ជាជាងរូបភាពតែមួយ។</p>
 <h3>ទិន្នន័យ និងឯកជនភាព</h3>
-<p>រូបភាព៖ Copernicus Sentinel-2 L2A ពី Earth Search STAC API (AWS Open Data)។ អាកាសធាតុ៖ Open-Meteo។ ឈ្មោះទីកន្លែង៖ OpenStreetMap Nominatim។ ស្រែ និងកំណត់ត្រារបស់អ្នករក្សាទុកតែក្នុងកម្មវិធីរុករកនេះប៉ុណ្ណោះ — ប្រើ <b>បម្រុងទុក</b> ដើម្បីផ្ទេរទៅឧបករណ៍ផ្សេង។</p>
+<p>រូបភាព៖ Copernicus Sentinel-2 L2A ពី Earth Search STAC API (AWS Open Data)។ អាកាសធាតុ៖ Open-Meteo។ ឃុំ/សង្កាត់ ស្រុក/ខណ្ឌ ខេត្ត៖ ព្រំដែនរដ្ឋបាល OCHA COD-AB (HDX) និងឈ្មោះពីបញ្ជីឈ្មោះរដ្ឋបាល គ.ជ.អ.ប (NCDD Gazetteer, Open Development Cambodia)។ ការស្វែងរកទីកន្លែង៖ OpenStreetMap Nominatim។ ស្រែ និងកំណត់ត្រារបស់អ្នករក្សាទុកតែក្នុងកម្មវិធីរុករកនេះប៉ុណ្ណោះ — ប្រើ <b>បម្រុងទុក</b> ដើម្បីផ្ទេរទៅឧបករណ៍ផ្សេង។</p>
 <p class="muted">ដែនកំណត់៖ ភីកសែល Sentinel-2 មានទំហំ ១០–២០ ម៉ែត្រ ដូច្នេះដីតូចៗ (&lt; 0.2 ហិកតា) មានភីកសែលតិច។ នៅរដូវវស្សា រូបភាពជាច្រើនមានពពក។</p>`,
 };
 

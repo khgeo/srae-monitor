@@ -1,0 +1,126 @@
+{
+ "soilTypes": "soil_types_crocker1962.geojson",
+ "soilTypesUpdated": "2026-11-15",
+ "bands": [
+  {
+   "band": 1,
+   "property": "clay",
+   "depth": "0-30cm",
+   "factor": 10,
+   "unit": "%",
+   "label": "Clay"
+  },
+  {
+   "band": 2,
+   "property": "sand",
+   "depth": "0-30cm",
+   "factor": 10,
+   "unit": "%",
+   "label": "Sand"
+  },
+  {
+   "band": 3,
+   "property": "phh2o",
+   "depth": "0-30cm",
+   "factor": 10,
+   "unit": "pH",
+   "label": "pH (H2O)"
+  },
+  {
+   "band": 4,
+   "property": "soc",
+   "depth": "0-30cm",
+   "factor": 10,
+   "unit": "g/kg",
+   "label": "Soil organic carbon"
+  },
+  {
+   "band": 5,
+   "property": "nitrogen",
+   "depth": "0-30cm",
+   "factor": 100,
+   "unit": "g/kg",
+   "label": "Total nitrogen"
+  },
+  {
+   "band": 6,
+   "property": "cec",
+   "depth": "0-30cm",
+   "factor": 10,
+   "unit": "cmol(+)/kg",
+   "label": "Cation exchange capacity"
+  },
+  {
+   "band": 7,
+   "property": "clay",
+   "depth": "30-60cm",
+   "factor": 10,
+   "unit": "%",
+   "label": "Clay"
+  },
+  {
+   "band": 8,
+   "property": "sand",
+   "depth": "30-60cm",
+   "factor": 10,
+   "unit": "%",
+   "label": "Sand"
+  },
+  {
+   "band": 9,
+   "property": "phh2o",
+   "depth": "30-60cm",
+   "factor": 10,
+   "unit": "pH",
+   "label": "pH (H2O)"
+  },
+  {
+   "band": 10,
+   "property": "soc",
+   "depth": "30-60cm",
+   "factor": 10,
+   "unit": "g/kg",
+   "label": "Soil organic carbon"
+  },
+  {
+   "band": 11,
+   "property": "nitrogen",
+   "depth": "30-60cm",
+   "factor": 100,
+   "unit": "g/kg",
+   "label": "Total nitrogen"
+  },
+  {
+   "band": 12,
+   "property": "cec",
+   "depth": "30-60cm",
+   "factor": 10,
+   "unit": "cmol(+)/kg",
+   "label": "Cation exchange capacity"
+  }
+ ],
+ "raster": "soilgrids_cambodia.tif",
+ "rasterUpdated": "2026-11-15",
+ "version": 1,
+ "bbox": [
+  102.3,
+  10.3,
+  107.7,
+  14.75
+ ],
+ "res": 0.005,
+ "nodata": -32768,
+ "sources": [
+  {
+   "name": "SoilGrids 2.0 (ISRIC - World Soil Information)",
+   "licence": "CC BY 4.0",
+   "url": "https://www.isric.org/explore/soilgrids",
+   "citation": "Poggio, L., de Sousa, L. M., et al. (2021). SoilGrids 2.0. SOIL 7, 217-240. https://doi.org/10.5194/soil-7-217-2021"
+  },
+  {
+   "name": "Distribution of soil types in Cambodia (Crocker, 1962) - Open Development Cambodia",
+   "licence": "CC BY 4.0",
+   "url": "https://data.opendevelopmentcambodia.net/dataset/distribution-soil-type-in-cambodia"
+  }
+ ]
+}

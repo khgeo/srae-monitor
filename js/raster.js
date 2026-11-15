@@ -1,7 +1,7 @@
 // Reads small windows from Sentinel-2 Cloud-Optimized GeoTIFFs with geotiff.js (HTTP range requests)
 // and computes a vegetation index on the field's lon/lat grid, masking clouds with the SCL band.
 
-import { gridToUtm } from './geo.js';
+import { gridToUtm, centroid, utmZone } from './geo.js';
 import { INDICES, stats, binCounts } from './indices.js';
 
 // SCL classes treated as cloud: 3 shadow, 8 medium, 9 high probability, 10 thin cirrus.
@@ -82,11 +82,67 @@ function gridUtm(grid, zone, south) {
   return grid._utm[key];
 }
 
+// Native pixel size of each Sentinel-2 band (m). S2 tile origins are multiples of 20 m in UTM, so
+// floor(x / res) identifies the satellite pixel a point falls in.
+export const BAND_RES = { blue: 10, green: 10, red: 10, nir: 10, visual: 10, rededge1: 20, rededge2: 20, rededge3: 20, nir08: 20, swir16: 20, swir22: 20, scl: 20 };
+export const indexRes = (def) => Math.max(10, ...def.bands.map(b => BAND_RES[b] || 10));
+
+/** Share of a pixel that must lie inside the field for it to count as a "pure" (non-edge) pixel. */
+export const PURE_COVER = 0.75;
+
+/**
+ * Which satellite pixels the field touches and how much of each lies inside it.
+ * Returns { nPix, nPure, pure: Uint8Array (1 for grid cells in pure satellite pixels), keyOf: Float64Array }.
+ */
+export function pixelPurity(grid, zone, south, pixRes = 10, xy) {
+  grid._pur = grid._pur || {};
+  const id = `${zone}${south ? 'S' : 'N'}${pixRes}`;
+  if (grid._pur[id]) return grid._pur[id];
+  if (!xy) xy = gridUtm(grid, zone, south).xy;
+  const n = grid.W * grid.H;
+  const keyOf = new Float64Array(n).fill(-1);
+  const count = new Map();
+  for (let i = 0; i < n; i++) {
+    if (!grid.inside[i]) continue;
+    const k = Math.floor(xy[2 * i] / pixRes) * 4e6 + Math.floor(xy[2 * i + 1] / pixRes);
+    keyOf[i] = k;
+    count.set(k, (count.get(k) || 0) + 1);
+  }
+  const full = (pixRes * pixRes) / grid.pixelAreaM2; // grid cells in one satellite pixel
+  const pureKeys = new Set();
+  for (const [k, c] of count) if (c / full >= PURE_COVER) pureKeys.add(k);
+  const pure = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (keyOf[i] >= 0 && pureKeys.has(keyOf[i])) pure[i] = 1;
+  return (grid._pur[id] = { nPix: count.size, nPure: pureKeys.size, pure, keyOf, pixRes });
+}
+
+/** Pixel counts for a field before any image is loaded (UTM zone from the field centre). */
+export function fieldPixelInfo(grid, geom, pixRes = 10) {
+  const [lon, lat] = centroid(geom);
+  return pixelPurity(grid, utmZone(lon, lat), lat < 0, pixRes);
+}
+
+/**
+ * Statistics with field-edge handling. Edge pixels mix the crop with bunds, paths and neighbouring
+ * plots. mode 'pure' uses only satellite pixels ≥75 % inside the field, 'all' uses every pixel
+ * (area-weighted), 'auto' uses pure pixels when at least 3 of them have clear data.
+ */
+export function edgeStats(values, pur, mode = 'auto') {
+  const all = stats(values);
+  if (mode === 'all' || !pur) return { stats: all, used: 'all', nPureValid: 0 };
+  const pv = new Float32Array(values.length).fill(NaN);
+  const keys = new Set();
+  for (let i = 0; i < values.length; i++) if (pur.pure[i] && Number.isFinite(values[i])) { pv[i] = values[i]; keys.add(pur.keyOf[i]); }
+  const nPureValid = keys.size;
+  if (mode === 'pure' ? nPureValid >= 1 : nPureValid >= 3) return { stats: stats(pv), statsAll: all, used: 'pure', nPureValid };
+  return { stats: all, used: 'all', nPureValid };
+}
+
 /**
  * Compute an index for one scene on the field grid.
  * status per pixel: 0 outside field, 1 valid, 2 cloud/shadow, 3 no data
  */
-export async function processScene(grid, scene, indexKey, { signal } = {}) {
+export async function processScene(grid, scene, indexKey, { signal, edgeMode = 'auto' } = {}) {
   const def = INDICES[indexKey];
   if (!def) throw new Error(`Unknown index ${indexKey}`);
   if (scene.zone == null) throw new Error('Scene has no UTM projection');
@@ -155,13 +211,16 @@ export async function processScene(grid, scene, indexKey, { signal } = {}) {
   }
 
   const covered = grid.count - nodata;
+  const pur = def.trueColor ? null : pixelPurity(grid, scene.zone, scene.south, indexRes(def), xy);
+  const es = def.trueColor ? null : edgeStats(values, pur, edgeMode);
   return {
+    edge: pur ? { pixRes: pur.pixRes, nPix: pur.nPix, nPure: pur.nPure, nPureValid: es.nPureValid, used: es.used } : null,
     sceneId: scene.id, date: scene.date, indexKey,
     values, status, rgb,
     valid, cloud, nodata, inside: grid.count,
     validFrac: grid.count ? valid / grid.count : 0,
     cloudFrac: covered > 0 ? cloud / covered : 1,
-    stats: def.trueColor ? null : stats(values),
+    stats: def.trueColor ? null : es.stats,
     bins: def.trueColor ? null : binCounts(indexKey, values),
   };
 }

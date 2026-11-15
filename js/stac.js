@@ -2,6 +2,7 @@
 // No API key needed; the API and the COG bucket both allow browser (CORS) access.
 
 import { centroid, pointInGeom, parseUtmEpsg, utmZone } from './geo.js';
+import { fetchRetry } from './net.js';
 
 export const STAC_URL = 'https://earth-search.aws.element84.com/v1/search';
 
@@ -82,12 +83,12 @@ export async function searchScenes(geometry, { start, end, maxCloud = 60, collec
   const items = [];
   let url = STAC_URL, method = 'POST', payload = body, guard = 0;
   while (url && items.length < maxItems && guard++ < 10) {
-    const res = await fetch(url, {
+    const res = await fetchRetry(url, {
       method,
       headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
       body: method === 'POST' ? JSON.stringify(payload) : undefined,
       signal,
-    });
+    }, { retries: 3 });
     if (!res.ok) throw new Error(`STAC ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const json = await res.json();
     items.push(...(json.features || []));

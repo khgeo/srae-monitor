@@ -1,0 +1,48 @@
+# Downloads open soil data for Cambodia into data/soil/ and commits it to this repository.
+# Runs automatically when the build script changes, or by hand:
+#   GitHub -> Actions -> "Update soil data" -> Run workflow
+name: Update soil data
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/build_soil_data.py
+      - .github/workflows/update-soil-data.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: soil-data
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install "rasterio>=1.3" numpy
+
+      - name: Build soil data
+        run: python scripts/build_soil_data.py
+
+      - name: Commit data/soil
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/soil
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update soil data (SoilGrids 2.0, ODC soil types)"
+            git pull --rebase
+            git push
+          fi

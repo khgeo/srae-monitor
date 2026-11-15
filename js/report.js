@@ -1,4 +1,5 @@
 // Printable field report opened in a new tab (use the browser's "Save as PDF").
+import { fieldLocation } from './admin.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -28,7 +29,7 @@ export function openReport(o) {
 <div class="bar"><button onclick="print()">${esc(t('report.print'))}</button></div>
 <div class="page">
   <h1>${esc(f.name)}</h1>
-  <div class="sub">${esc(t('report.title'))} · ${esc(fmtDate(new Date().toISOString().slice(0, 10)))}${f.location ? ` · ${esc(f.location)}` : ''}</div>
+  <div class="sub">${esc(t('report.title'))} · ${esc(fmtDate(new Date().toISOString().slice(0, 10)))}${fieldLocation(f, lang) ? ` · ${esc(fieldLocation(f, lang))}` : ''}</div>
   <h2>${esc(t('ov.info'))}</h2>
   <div class="grid">
     <div class="k"><span>${esc(t('field.crop'))}</span><b>${esc(o.crop)}</b></div>
@@ -51,6 +52,14 @@ export function openReport(o) {
     <div class="k"><span>${esc(t('wx.rainNext7'))}</span><b>${o.wx.rainNext7.toFixed(0)} mm</b></div>
     <div class="k"><span>${esc(t('wx.gdd'))}</span><b>${o.wx.acc ? Math.round(o.wx.acc.gdd) : '—'}</b></div>
     <div class="k"><span>${esc(t('wx.rainSince'))}</span><b>${o.wx.acc ? Math.round(o.wx.acc.rain) + ' mm' : '—'}</b></div></div>` : ''}
+  ${o.soil ? `<h2>${esc(t('soil.title'))}</h2>
+   <div class="grid">
+    <div class="k"><span>${esc(t('soil.texture'))}</span><b>${esc(o.soil.texture)}</b></div>
+    <div class="k"><span>pH</span><b>${esc(o.soil.ph)}</b></div>
+    <div class="k"><span>${esc(t('soil.soc'))}</span><b>${esc(o.soil.soc)} g/kg</b></div>
+    <div class="k"><span>${esc(t('soil.suitFor', { crop: o.crop }))}</span><b>${esc(o.soil.suit || '—')}</b></div></div>
+   <p class="sub">${esc(t('soil.clay'))} ${esc(o.soil.clay)}% · ${esc(t('soil.silt'))} ${esc(o.soil.silt)}% · ${esc(t('soil.sand'))} ${esc(o.soil.sand)}% · ${esc(t('soil.n'))} ${esc(o.soil.n)} g/kg · CEC ${esc(o.soil.cec)} cmol(+)/kg${o.soil.type ? ` · ${esc(t('soil.type'))}: ${esc(o.soil.type)}` : ''}</p>
+   <ul>${o.soil.advice.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
   ${zonesRows ? `<h2>${esc(t('zones.title'))}</h2><p class="sub">${esc(o.zones.label)}</p>
    <table><tr><th>${esc(t('zones.zone'))}</th><th>${esc(t('legend.mean'))}</th><th>${esc(t('unit.ha'))}</th><th>%</th><th>${esc(t('zones.rate'))}</th></tr>${zonesRows}</table>` : ''}
   ${o.notes.length ? `<h2>${esc(t('notes.title'))}</h2><table>${o.notes.map(n => `<tr><td>${esc(fmtDate(n.date))}</td><td>${esc(t('cat.' + n.cat))}</td><td>${esc(n.text)}</td><td>${n.photo ? `<img src="${n.photo}" style="max-width:120px;border-radius:4px">` : ''}</td></tr>`).join('')}</table>` : ''}

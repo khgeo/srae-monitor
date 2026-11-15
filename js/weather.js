@@ -6,13 +6,16 @@ const FORECAST = 'https://api.open-meteo.com/v1/forecast';
 const ARCHIVE = 'https://archive-api.open-meteo.com/v1/archive';
 const DAILY = 'temperature_2m_max,temperature_2m_min,precipitation_sum,et0_fao_evapotranspiration';
 
+import { getJsonRetry, fetchRetry, rateQueue } from './net.js';
+
 const iso = (d) => d.toISOString().slice(0, 10);
 
-async function getJson(url, signal) {
-  const r = await fetch(url, { signal });
-  if (!r.ok) throw new Error(`Open-Meteo ${r.status}`);
-  return r.json();
-}
+const getJson = (url, signal) => getJsonRetry(url, { signal }, 'Open-Meteo');
+
+// Nominatim allows 1 request per second for the whole site, so calls from this browser are queued
+// and answers cached. Inside Cambodia the app names places from its own commune file instead (admin.js).
+export const nominatimQueue = rateQueue(1100);
+const placeCache = new Map();
 
 function dailyRows(json, forecastFrom) {
   const d = json.daily || {};
@@ -93,13 +96,17 @@ export async function getElevation(lat, lon) {
 
 /** Reverse-geocode to a short "district, province" style label (OpenStreetMap Nominatim). */
 export async function getPlaceName(lat, lon, lang = 'en') {
+  const key = `${lat.toFixed(3)},${lon.toFixed(3)},${lang}`;
+  if (placeCache.has(key)) return placeCache.get(key);
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=12&accept-language=${lang === 'km' ? 'km,en' : 'en'}`);
+    const r = await nominatimQueue(() => fetchRetry(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}&zoom=12&accept-language=${lang === 'km' ? 'km,en' : 'en'}`, {}, { retries: 2, base: 2000 }));
     if (!r.ok) return null;
     const j = await r.json();
     const a = j.address || {};
     const parts = [a.village || a.hamlet || a.suburb, a.county || a.city_district || a.district || a.town || a.city, a.state || a.province, a.country]
       .filter(Boolean);
-    return [...new Set(parts)].join(', ') || j.display_name || null;
+    const label = [...new Set(parts)].join(', ') || j.display_name || null;
+    placeCache.set(key, label);
+    return label;
   } catch { return null; }
 }

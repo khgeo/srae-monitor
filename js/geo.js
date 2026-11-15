@@ -147,10 +147,22 @@ export function cleanGeom(geom) {
 }
 
 /**
- * Regular lon/lat grid covering a field at ~targetRes metres per pixel.
+ * Grid cell size for a field. Small plots get a fine grid so that the 10 m Sentinel-2 pixels are
+ * weighted by how much of each lies inside the field (area-weighted means, exact field shape),
+ * instead of being kept or dropped whole by their centre point.
+ */
+export function autoRes(areaM2) {
+  if (areaM2 < 2e4) return 2;     // < 2 ha
+  if (areaM2 < 1e5) return 5;     // < 10 ha
+  return 10;
+}
+
+/**
+ * Regular lon/lat grid covering a field at ~targetRes metres per pixel (default: autoRes).
  * Pixel size grows automatically if the field is very large, capping the pixel count.
  */
-export function makeGrid(geom, targetRes = 10, maxPixels = 400000) {
+export function makeGrid(geom, targetRes, maxPixels = 400000) {
+  if (!targetRes) targetRes = autoRes(areaM2(geom));
   const [w, s, e, n] = bbox(geom);
   const lat0 = (s + n) / 2;
   const mPerDegLat = 111320;
